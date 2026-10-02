@@ -1,9 +1,18 @@
-import * as Location from 'expo-location';
+// Safe lazy import for expo-location so it never crashes if ExpoLocation native module is not present
+let Location: any = null;
+try {
+  const mod = require('expo-location');
+  Location = mod.default || mod;
+} catch (e) {
+  // ExpoLocation missing
+}
 
 export interface LocationState {
   latitude: number;
   longitude: number;
   label: string;
+  cityName?: string;
+  district?: string;
   isRealGps: boolean;
   accuracy?: number | null;
   error?: string | null;
@@ -14,12 +23,14 @@ const DEFAULT_VILNIUS: LocationState = {
   latitude: 54.6853,
   longitude: 25.2872,
   label: 'Vilnius Old Town',
+  cityName: 'Vilnius, Lithuania',
+  district: 'Senamiestis',
   isRealGps: false,
 };
 
 let currentState: LocationState = { ...DEFAULT_VILNIUS };
 const listeners: Array<() => void> = [];
-let locationSubscription: Location.LocationSubscription | null = null;
+let locationSubscription: any = null;
 let isWatching = false;
 
 function notify() {
@@ -30,6 +41,28 @@ function notify() {
       // ignore
     }
   });
+}
+
+async function reverseGeocodeCoords(latitude: number, longitude: number) {
+  if (!Location || typeof Location.reverseGeocodeAsync !== 'function') return null;
+  try {
+    const res = await Location.reverseGeocodeAsync({ latitude, longitude });
+    if (res && res.length > 0) {
+      const p = res[0];
+      const city = p.city || p.subregion || p.region || '';
+      const country = p.country || '';
+      const district = p.district || p.street || '';
+      const cityName = city && country ? `${city}, ${country}` : (city || country || 'Vilnius, Lithuania');
+      return {
+        cityName,
+        district,
+        label: district && city ? `${district}, ${city}` : (city || district || 'Vilnius, Lithuania'),
+      };
+    }
+  } catch (e) {
+    // ignore
+  }
+  return null;
 }
 
 export const LocationService = {
@@ -55,6 +88,15 @@ export const LocationService = {
    * Initialize real-time device GPS location and watch for movement
    */
   async initRealTimeLocation(): Promise<{ success: boolean; message?: string }> {
+    if (!Location || typeof Location.requestForegroundPermissionsAsync !== 'function') {
+      currentState = {
+        ...currentState,
+        error: null,
+        isRealGps: false,
+      };
+      notify();
+      return { success: false, message: 'ExpoLocation not available in Expo Go' };
+    }
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
@@ -72,10 +114,14 @@ export const LocationService = {
         accuracy: Location.Accuracy.Balanced,
       });
 
+      const geo = await reverseGeocodeCoords(position.coords.latitude, position.coords.longitude);
+
       currentState = {
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
-        label: 'My Real Location (Live GPS)',
+        label: geo?.label || 'Vilnius Old Town',
+        cityName: geo?.cityName || 'Vilnius, Lithuania',
+        district: geo?.district || '',
         isRealGps: true,
         accuracy: position.coords.accuracy,
         error: null,
@@ -88,20 +134,36 @@ export const LocationService = {
         locationSubscription = await Location.watchPositionAsync(
           {
             accuracy: Location.Accuracy.High,
-            distanceInterval: 10, // update when moved 10 meters
+            distanceInterval: 15, // update when moved 15 meters
             timeInterval: 5000,   // or every 5 seconds
           },
-          (newPos) => {
+          async (newPos: any) => {
             if (currentState.isRealGps) {
+              const prevLat = currentState.latitude;
+              const prevLng = currentState.longitude;
+              const movedEnough = Math.abs(newPos.coords.latitude - prevLat) > 0.001 || Math.abs(newPos.coords.longitude - prevLng) > 0.001;
+
               currentState = {
+                ...currentState,
                 latitude: newPos.coords.latitude,
                 longitude: newPos.coords.longitude,
-                label: 'My Real Location (Live GPS)',
-                isRealGps: true,
                 accuracy: newPos.coords.accuracy,
                 error: null,
               };
               notify();
+
+              if (movedEnough || !currentState.cityName) {
+                const updatedGeo = await reverseGeocodeCoords(newPos.coords.latitude, newPos.coords.longitude);
+                if (updatedGeo) {
+                  currentState = {
+                    ...currentState,
+                    cityName: updatedGeo.cityName,
+                    district: updatedGeo.district,
+                    label: updatedGeo.label,
+                  };
+                  notify();
+                }
+              }
             }
           }
         );

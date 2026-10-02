@@ -14,17 +14,31 @@ import {
   useColorScheme,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as ImagePicker from 'expo-image-picker';
-import * as AppleAuthentication from 'expo-apple-authentication';
+
+// Safe lazy imports so Expo Go sandbox does not crash on missing native modules
+let ImagePicker: any = null;
+try {
+  const mod = require('expo-image-picker');
+  ImagePicker = mod.default || mod;
+} catch (e) {}
+
+let AppleAuthentication: any = null;
+try {
+  const mod = require('expo-apple-authentication');
+  AppleAuthentication = mod.default || mod;
+} catch (e) {}
 
 import {
   AppleLogo,
   GoogleLogo,
   MailIcon,
   LockIcon,
+  EyeIcon,
+  EyeOffIcon,
   CalendarIcon,
   UserIcon,
   CameraIcon,
+  ArrowLeftIcon,
 } from './brand-icons';
 import { AVATAR_PRESETS, DEMO_ACCOUNT, UserService } from '@/services/user-storage';
 import { WiseColors } from '@/constants/theme';
@@ -45,7 +59,7 @@ export function AuthScreen({ onSuccess }: AuthScreenProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  // Sign up specific fields
+  // Sign up specific fields (asking details)
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -87,6 +101,13 @@ export function AuthScreen({ onSuccess }: AuthScreenProps) {
   // -------------------------------------------------------------
   async function handlePickImage() {
     setErrorMessage(null);
+    if (!ImagePicker || typeof ImagePicker.requestMediaLibraryPermissionsAsync !== 'function') {
+      Alert.alert(
+        'Photo Upload in Expo Go',
+        'Custom photo picker requires a development build. Please choose one of the avatar presets below!'
+      );
+      return;
+    }
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
@@ -114,6 +135,13 @@ export function AuthScreen({ onSuccess }: AuthScreenProps) {
 
   async function handleTakePhoto() {
     setErrorMessage(null);
+    if (!ImagePicker || typeof ImagePicker.requestCameraPermissionsAsync !== 'function') {
+      Alert.alert(
+        'Camera in Expo Go',
+        'Camera capture requires a development build. Please choose one of the avatar presets below!'
+      );
+      return;
+    }
     try {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
       if (!permission.granted) {
@@ -134,32 +162,31 @@ export function AuthScreen({ onSuccess }: AuthScreenProps) {
         setAvatarUri(result.assets[0].uri);
       }
     } catch (e) {
-      Alert.alert('Error', 'Unable to open camera.');
+      Alert.alert('Error', 'Unable to take photo.');
     }
   }
 
   function handleChooseAvatarSource() {
-    Alert.alert('Profile Picture', 'Choose an option to set your traveler photo', [
-      { text: 'Choose from Photos', onPress: handlePickImage },
-      { text: 'Take a Photo', onPress: handleTakePhoto },
-      {
-        text: 'Remove Photo',
-        style: 'destructive',
-        onPress: () => setAvatarUri(null),
-      },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+    Alert.alert(
+      'Profile Picture',
+      'Choose a photo or selfie for your TapTale traveler passport:',
+      [
+        { text: 'Choose from Library', onPress: handlePickImage },
+        { text: 'Take Photo', onPress: handleTakePhoto },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
   }
 
   // -------------------------------------------------------------
-  // Real Social Logins (Apple & Google)
+  // Real Social Authentication Handler
   // -------------------------------------------------------------
   async function handleAppleSignIn() {
     setIsLoading(true);
     setErrorMessage(null);
 
     try {
-      if (Platform.OS === 'ios') {
+      if (Platform.OS === 'ios' && AppleAuthentication) {
         const isAvailable = await AppleAuthentication.isAvailableAsync();
         if (isAvailable) {
           const credential = await AppleAuthentication.signInAsync({
@@ -169,9 +196,10 @@ export function AuthScreen({ onSuccess }: AuthScreenProps) {
             ],
           });
 
-          const givenName = credential.fullName?.givenName || '';
-          const familyName = credential.fullName?.familyName || '';
-          const fullName = [givenName, familyName].filter(Boolean).join(' ') || 'Apple Explorer';
+          const fullName = credential.fullName
+            ? `${credential.fullName.givenName || ''} ${credential.fullName.familyName || ''}`.trim()
+            : 'Apple Traveler';
+
           const realEmail =
             credential.email ||
             (credential.user ? `${credential.user.slice(0, 10)}@privaterelay.appleid.com` : '');
@@ -192,7 +220,6 @@ export function AuthScreen({ onSuccess }: AuthScreenProps) {
       console.warn('Apple Authentication note:', err);
     }
 
-    // Prompt user to connect their real Apple ID (no hardcoded fake accounts!)
     setSocialModalType('apple');
     setSocialNameInput('');
     setSocialEmailInput('');
@@ -203,7 +230,6 @@ export function AuthScreen({ onSuccess }: AuthScreenProps) {
   function handleGoogleSignIn() {
     setIsLoading(true);
     setErrorMessage(null);
-    // Open Google Account connection sheet so the user can connect their real Google Account
     setSocialModalType('google');
     setSocialNameInput('');
     setSocialEmailInput('');
@@ -367,264 +393,468 @@ export function AuthScreen({ onSuccess }: AuthScreenProps) {
           ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled">
-          {/* Header Brand */}
-          <View style={styles.brandHeader}>
-            <View style={styles.brandLogoRow}>
-              <View style={styles.brandIconCircle}>
-                <Text style={styles.brandBolt}>⚡</Text>
-              </View>
-              <View>
-                <Text style={[styles.brandTitle, { color: colors.text }]}>TapTale</Text>
-                <Text style={[styles.brandSubtitle, { color: colors.textMuted }]}>
-                  Smart Heritage Guide
+
+          {/* ========================================================= */}
+          {/* VIEW MODE 1: SIGN IN PAGE                                 */}
+          {/* ========================================================= */}
+          {authMode === 'sign_in' ? (
+            <View>
+              {/* Brand Header */}
+              <View style={styles.brandHeader}>
+                <View style={styles.brandLogoRow}>
+                  <View style={styles.brandIconCircle}>
+                    <Text style={styles.brandBolt}>⚡</Text>
+                  </View>
+                  <View>
+                    <Text style={[styles.brandTitle, { color: colors.text }]}>TapTale</Text>
+                    <Text style={[styles.brandSubtitle, { color: colors.textMuted }]}>
+                      Smart Heritage Guide
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={[styles.welcomeHeadline, { color: colors.text }]}>
+                  Welcome back.
+                </Text>
+                <Text style={[styles.welcomeSubline, { color: colors.textMuted }]}>
+                  Sign in to access your unlocked Vilnius passes, stories, and badges.
                 </Text>
               </View>
-            </View>
 
-            <Text style={[styles.welcomeHeadline, { color: colors.text }]}>
-              {authMode === 'sign_in' ? 'Welcome back.' : 'Create your traveler passport.'}
-            </Text>
-            <Text style={[styles.welcomeSubline, { color: colors.textMuted }]}>
-              {authMode === 'sign_in'
-                ? 'Sign in to access your unlocked Vilnius passes, stories, and badges.'
-                : 'Join thousands exploring Lithuania with physical NFC smart stories.'}
-            </Text>
-          </View>
-
-          {/* Mode Switcher Tabs */}
-          <View style={[styles.tabSelector, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
-            <Pressable
-              style={[
-                styles.tabButton,
-                authMode === 'sign_in' && [styles.tabButtonActive, { backgroundColor: colors.cardBg }],
-              ]}
-              onPress={() => {
-                setAuthMode('sign_in');
-                setErrorMessage(null);
-              }}>
-              <Text
-                style={[
-                  styles.tabButtonText,
-                  { color: authMode === 'sign_in' ? colors.text : colors.textMuted },
-                  authMode === 'sign_in' && styles.tabButtonTextActive,
-                ]}>
-                Sign In
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={[
-                styles.tabButton,
-                authMode === 'sign_up' && [styles.tabButtonActive, { backgroundColor: colors.cardBg }],
-              ]}
-              onPress={() => {
-                setAuthMode('sign_up');
-                setErrorMessage(null);
-              }}>
-              <Text
-                style={[
-                  styles.tabButtonText,
-                  { color: authMode === 'sign_up' ? colors.text : colors.textMuted },
-                  authMode === 'sign_up' && styles.tabButtonTextActive,
-                ]}>
-                Create Account
-              </Text>
-            </Pressable>
-          </View>
-
-          {/* Error Banner */}
-          {errorMessage ? (
-            <View style={styles.errorBanner}>
-              <Text style={styles.errorIcon}>⚠️</Text>
-              <Text style={styles.errorText}>{errorMessage}</Text>
-            </View>
-          ) : null}
-
-          {/* Card Container */}
-          <View
-            style={[
-              styles.card,
-              { backgroundColor: colors.cardBg, borderColor: colors.border },
-            ]}>
-            {/* ========================================================= */}
-            {/* SOCIAL LOGINS WITH ORIGINAL ICONS                         */}
-            {/* ========================================================= */}
-            <View style={styles.socialSection}>
-              {/* Apple Sign In Button */}
-              <Pressable
-                style={({ pressed }) => [
-                  styles.appleButton,
-                  pressed && { opacity: 0.85, transform: [{ scale: 0.99 }] },
-                ]}
-                onPress={handleAppleSignIn}
-                disabled={isLoading}>
-                <View style={styles.socialIconSlot}>
-                  <AppleLogo size={20} color="#ffffff" />
-                </View>
-                <Text style={styles.appleButtonText}>Continue with Apple</Text>
-              </Pressable>
-
-              {/* Google Sign In Button */}
-              <Pressable
-                style={({ pressed }) => [
-                  styles.googleButton,
-                  { borderColor: colors.border },
-                  pressed && { opacity: 0.85, transform: [{ scale: 0.99 }] },
-                ]}
-                onPress={handleGoogleSignIn}
-                disabled={isLoading}>
-                <View style={styles.socialIconSlot}>
-                  <GoogleLogo size={20} />
-                </View>
-                <Text style={styles.googleButtonText}>Continue with Google</Text>
-              </Pressable>
-            </View>
-
-            {/* Divider */}
-            <View style={styles.dividerRow}>
-              <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-              <Text style={[styles.dividerText, { color: colors.textMuted }]}>
-                {authMode === 'sign_in' ? 'or sign in with email' : 'or register with email'}
-              </Text>
-              <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-            </View>
-
-            {/* ========================================================= */}
-            {/* SIGN IN FORM                                              */}
-            {/* ========================================================= */}
-            {authMode === 'sign_in' ? (
-              <View style={styles.formContainer}>
-                {/* Dedicated Demo Account Card */}
-                <View
-                  style={[
-                    styles.demoCard,
-                    {
-                      backgroundColor: isDark ? '#152b1e' : '#f0fdf4',
-                      borderColor: isDark ? '#254b34' : '#bbf7d0',
-                    },
-                  ]}>
-                  <View style={styles.demoCardHeader}>
-                    <View style={styles.demoBadgePill}>
-                      <Text style={styles.demoBadgeText}>DEMO ACCOUNT</Text>
-                    </View>
-                    <Pressable onPress={handleAutofillDemo} style={styles.autofillBtn}>
-                      <Text style={styles.autofillBtnText}>⚡ Auto-fill</Text>
-                    </Pressable>
-                  </View>
-                  <Text style={[styles.demoCardDesc, { color: colors.textMuted }]}>
-                    Log in with this demo profile to preview all unlocked Vilnius passes, lore, and achievements:
-                  </Text>
-                  <View style={styles.credRow}>
-                    <Text style={[styles.credLabel, { color: colors.text }]}>Email:</Text>
-                    <Text style={styles.credVal}>{DEMO_ACCOUNT.email}</Text>
-                  </View>
-                  <View style={styles.credRow}>
-                    <Text style={[styles.credLabel, { color: colors.text }]}>Password:</Text>
-                    <Text style={styles.credVal}>{DEMO_ACCOUNT.password}</Text>
-                  </View>
-
-                  <Pressable
-                    style={({ pressed }) => [
-                      styles.demoInstantBtn,
-                      pressed && { opacity: 0.9, transform: [{ scale: 0.99 }] },
-                    ]}
-                    onPress={handleDemoLogin}>
-                    <Text style={styles.demoInstantBtnText}>🚀 1-Tap Sign In with Demo</Text>
-                  </Pressable>
-                </View>
-
-                {/* Email Field */}
-                <View style={styles.inputGroup}>
-                  <Text style={[styles.inputLabel, { color: colors.text }]}>Email Address</Text>
-                  <View
-                    style={[
-                      styles.inputWrapper,
-                      { backgroundColor: colors.inputBg, borderColor: colors.border },
-                    ]}>
-                    <MailIcon size={18} color={colors.textMuted} />
-                    <TextInput
-                      style={[styles.textInput, { color: colors.text }]}
-                      placeholder="e.g. allan@traveler.com"
-                      placeholderTextColor={colors.textMuted}
-                      value={email}
-                      onChangeText={setEmail}
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                    />
-                  </View>
-                </View>
-
-                {/* Password Field */}
-                <View style={styles.inputGroup}>
-                  <View style={styles.inputLabelRow}>
-                    <Text style={[styles.inputLabel, { color: colors.text }]}>Password</Text>
-                    <Pressable
-                      onPress={() =>
-                        Alert.alert('Demo Password Reset', 'For testing, you can use any password or click Demo Sign In.')
-                      }>
-                      <Text style={[styles.forgotLink, { color: WiseColors.forestGreen }]}>
-                        Forgot password?
-                      </Text>
-                    </Pressable>
-                  </View>
-                  <View
-                    style={[
-                      styles.inputWrapper,
-                      { backgroundColor: colors.inputBg, borderColor: colors.border },
-                    ]}>
-                    <LockIcon size={18} color={colors.textMuted} />
-                    <TextInput
-                      style={[styles.textInput, { color: colors.text }]}
-                      placeholder="Enter your password"
-                      placeholderTextColor={colors.textMuted}
-                      value={password}
-                      onChangeText={setPassword}
-                      secureTextEntry={!showPassword}
-                      autoCapitalize="none"
-                    />
-                    <Pressable
-                      style={styles.eyeToggle}
-                      onPress={() => setShowPassword(!showPassword)}>
-                      <Text style={styles.eyeToggleText}>{showPassword ? '🙈' : '👁️'}</Text>
-                    </Pressable>
-                  </View>
-                </View>
-
-                {/* Sign In CTA Button */}
+              {/* Mode Switcher Tabs */}
+              <View style={[styles.tabSelector, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
                 <Pressable
-                  style={({ pressed }) => [
-                    styles.primaryButton,
-                    pressed && { opacity: 0.9, transform: [{ scale: 0.99 }] },
-                  ]}
-                  onPress={handleEmailSignIn}
-                  disabled={isLoading}>
-                  <Text style={styles.primaryButtonText}>
-                    {isLoading ? 'Signing In...' : 'Sign In to TapTale'}
+                  style={[styles.tabButton, styles.tabButtonActive, { backgroundColor: colors.cardBg }]}
+                  onPress={() => {
+                    setAuthMode('sign_in');
+                    setErrorMessage(null);
+                  }}>
+                  <Text style={[styles.tabButtonText, styles.tabButtonTextActive, { color: colors.text }]}>
+                    Sign In
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  style={styles.tabButton}
+                  onPress={() => {
+                    setAuthMode('sign_up');
+                    setErrorMessage(null);
+                  }}>
+                  <Text style={[styles.tabButtonText, { color: colors.textMuted }]}>
+                    Create Account
                   </Text>
                 </Pressable>
               </View>
-            ) : (
-              /* ========================================================= */
-              /* SIGN UP / CREATE ACCOUNT FORM                             */
-              /* ========================================================= */
-              <View style={styles.formContainer}>
-                {/* Fresh Start Notice */}
-                <View
-                  style={[
-                    styles.freshNoticeBox,
-                    {
-                      backgroundColor: isDark ? '#0f2438' : '#f0f9ff',
-                      borderColor: isDark ? '#1e3a5f' : '#bae6fd',
-                    },
-                  ]}>
-                  <Text style={[styles.freshNoticeTitle, { color: isDark ? '#38bdf8' : '#0369a1' }]}>
-                    🌱 Fresh Start Account
+
+              {/* Error Banner */}
+              {errorMessage ? (
+                <View style={styles.errorBanner}>
+                  <Text style={styles.errorIcon}>⚠️</Text>
+                  <Text style={styles.errorText}>{errorMessage}</Text>
+                </View>
+              ) : null}
+
+              {/* Main Sign In Card Container */}
+              <View
+                style={[
+                  styles.card,
+                  { backgroundColor: colors.cardBg, borderColor: colors.border },
+                ]}>
+                {/* Social Logins with Official Logos */}
+                <View style={styles.socialSection}>
+                  {/* Apple Sign In Button */}
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.appleButton,
+                      pressed && { opacity: 0.85, transform: [{ scale: 0.99 }] },
+                    ]}
+                    onPress={handleAppleSignIn}
+                    disabled={isLoading}>
+                    <View style={styles.socialIconSlot}>
+                      <AppleLogo size={20} color="#ffffff" />
+                    </View>
+                    <Text style={styles.appleButtonText}>Continue with Apple</Text>
+                  </Pressable>
+
+                  {/* Google Sign In Button */}
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.googleButton,
+                      { borderColor: colors.border },
+                      pressed && { opacity: 0.85, transform: [{ scale: 0.99 }] },
+                    ]}
+                    onPress={handleGoogleSignIn}
+                    disabled={isLoading}>
+                    <View style={styles.socialIconSlot}>
+                      <GoogleLogo size={20} />
+                    </View>
+                    <Text style={styles.googleButtonText}>Continue with Google</Text>
+                  </Pressable>
+                </View>
+
+                {/* Divider */}
+                <View style={styles.dividerRow}>
+                  <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+                  <Text style={[styles.dividerText, { color: colors.textMuted }]}>
+                    or sign in with email
                   </Text>
-                  <Text style={[styles.freshNoticeDesc, { color: isDark ? '#94a3b8' : '#0c4a6e' }]}>
-                    Your personal account starts with 0 unlocked passes so you can tap real physical NFC tags across Lithuania to unlock stories!
+                  <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+                </View>
+
+                {/* Sign In Form */}
+                <View style={styles.formContainer}>
+                  {/* Dedicated Demo Account Card */}
+                  <View
+                    style={[
+                      styles.demoCard,
+                      {
+                        backgroundColor: isDark ? '#152b1e' : '#f0fdf4',
+                        borderColor: isDark ? '#254b34' : '#bbf7d0',
+                      },
+                    ]}>
+                    <View style={styles.demoCardHeader}>
+                      <View style={styles.demoBadgePill}>
+                        <Text style={styles.demoBadgeText}>DEMO ACCOUNT</Text>
+                      </View>
+                      <Pressable onPress={handleAutofillDemo} style={styles.autofillBtn}>
+                        <Text style={styles.autofillBtnText}>⚡ Auto-fill</Text>
+                      </Pressable>
+                    </View>
+                    <Text style={[styles.demoCardDesc, { color: colors.textMuted }]}>
+                      Log in with this demo profile to preview your unlocked Cathedral Square pass, lore, and achievements:
+                    </Text>
+                    <View style={styles.credRow}>
+                      <Text style={[styles.credLabel, { color: colors.text }]}>Email:</Text>
+                      <Text style={styles.credVal}>{DEMO_ACCOUNT.email}</Text>
+                    </View>
+                    <View style={styles.credRow}>
+                      <Text style={[styles.credLabel, { color: colors.text }]}>Password:</Text>
+                      <Text style={styles.credVal}>{DEMO_ACCOUNT.password}</Text>
+                    </View>
+
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.demoInstantBtn,
+                        pressed && { opacity: 0.9, transform: [{ scale: 0.99 }] },
+                      ]}
+                      onPress={handleDemoLogin}>
+                      <Text style={styles.demoInstantBtnText}>🚀 1-Tap Sign In with Demo</Text>
+                    </Pressable>
+                  </View>
+
+                  {/* Email Field with Normal Mail Icon */}
+                  <View style={styles.inputGroup}>
+                    <Text style={[styles.inputLabel, { color: colors.text }]}>Email Address</Text>
+                    <View
+                      style={[
+                        styles.inputWrapper,
+                        { backgroundColor: colors.inputBg, borderColor: colors.border },
+                      ]}>
+                      <MailIcon size={18} color={colors.textMuted} />
+                      <TextInput
+                        style={[styles.textInput, { color: colors.text }]}
+                        placeholder="e.g. allan@traveler.com"
+                        placeholderTextColor={colors.textMuted}
+                        value={email}
+                        onChangeText={setEmail}
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+                    </View>
+                  </View>
+
+                  {/* Password Field with Normal Lock Icon & Normal Eye Icon */}
+                  <View style={styles.inputGroup}>
+                    <View style={styles.inputLabelRow}>
+                      <Text style={[styles.inputLabel, { color: colors.text }]}>Password</Text>
+                      <Pressable
+                        onPress={() =>
+                          Alert.alert('Demo Password Reset', 'For testing, you can use any password or click Demo Sign In.')
+                        }>
+                        <Text style={[styles.forgotLink, { color: WiseColors.forestGreen }]}>
+                          Forgot password?
+                        </Text>
+                      </Pressable>
+                    </View>
+                    <View
+                      style={[
+                        styles.inputWrapper,
+                        { backgroundColor: colors.inputBg, borderColor: colors.border },
+                      ]}>
+                      <LockIcon size={18} color={colors.textMuted} />
+                      <TextInput
+                        style={[styles.textInput, { color: colors.text }]}
+                        placeholder="Enter your password"
+                        placeholderTextColor={colors.textMuted}
+                        value={password}
+                        onChangeText={setPassword}
+                        secureTextEntry={!showPassword}
+                        autoCapitalize="none"
+                      />
+                      <Pressable
+                        style={styles.eyeToggle}
+                        onPress={() => setShowPassword(!showPassword)}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                        {showPassword ? (
+                          <EyeOffIcon size={20} color={colors.textMuted} />
+                        ) : (
+                          <EyeIcon size={20} color={colors.textMuted} />
+                        )}
+                      </Pressable>
+                    </View>
+                  </View>
+
+                  {/* Sign In CTA Button */}
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.primaryButton,
+                      pressed && { opacity: 0.9, transform: [{ scale: 0.99 }] },
+                    ]}
+                    onPress={handleEmailSignIn}
+                    disabled={isLoading}>
+                    <Text style={styles.primaryButtonText}>
+                      {isLoading ? 'Signing In...' : 'Sign In to TapTale'}
+                    </Text>
+                  </Pressable>
+                </View>
+
+                {/* Bottom Footer Info */}
+                <Text style={[styles.termsText, { color: colors.textMuted }]}>
+                  By continuing, you agree to TapTale’s Terms of Service and Privacy Policy. Unlocked
+                  heritage stories will be tied to this traveler profile.
+                </Text>
+              </View>
+
+              {/* Dedicated Card Prompt to Navigate to Create Account Page */}
+              <View
+                style={[
+                  styles.createAccountPromptCard,
+                  {
+                    backgroundColor: isDark ? '#14251c' : '#f0fdf4',
+                    borderColor: isDark ? '#254b34' : '#bbf7d0',
+                  },
+                ]}>
+                <View style={styles.createAccountPromptText}>
+                  <Text style={[styles.createPromptTitle, { color: colors.text }]}>
+                    New to TapTale?
+                  </Text>
+                  <Text style={[styles.createPromptSub, { color: colors.textMuted }]}>
+                    Create a personalized traveler profile to unlock physical NFC passes across Lithuania.
                   </Text>
                 </View>
+                <Pressable
+                  style={styles.createPromptButton}
+                  onPress={() => {
+                    setAuthMode('sign_up');
+                    setErrorMessage(null);
+                  }}>
+                  <Text style={styles.createPromptButtonText}>Create Account →</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : (
+            /* ========================================================= */
+            /* VIEW MODE 2: DEDICATED CREATE ACCOUNT PAGE                */
+            /* ========================================================= */
+            <View>
+              {/* Back to Sign In Header Bar */}
+              <View style={styles.pageTopBar}>
+                <Pressable
+                  style={styles.backButton}
+                  onPress={() => {
+                    setAuthMode('sign_in');
+                    setErrorMessage(null);
+                  }}>
+                  <ArrowLeftIcon size={18} color={colors.text} />
+                  <Text style={[styles.backButtonText, { color: colors.text }]}>Back to Sign In</Text>
+                </Pressable>
+
+                <View style={styles.stepBadge}>
+                  <Text style={styles.stepBadgeText}>REGISTRATION</Text>
+                </View>
+              </View>
+
+              {/* Page Title & Subtitle */}
+              <View style={styles.createPageHeader}>
+                <Text style={[styles.createPageTitle, { color: colors.text }]}>
+                  Create Your Account
+                </Text>
+                <Text style={[styles.createPageSubtitle, { color: colors.textMuted }]}>
+                  Please provide your traveler details below to set up your Lithuania heritage passport.
+                </Text>
+              </View>
+
+              {/* Error Banner */}
+              {errorMessage ? (
+                <View style={styles.errorBanner}>
+                  <Text style={styles.errorIcon}>⚠️</Text>
+                  <Text style={styles.errorText}>{errorMessage}</Text>
+                </View>
+              ) : null}
+
+              {/* Fresh Start Notice Box */}
+              <View
+                style={[
+                  styles.freshNoticeBox,
+                  {
+                    backgroundColor: isDark ? '#0f2438' : '#f0f9ff',
+                    borderColor: isDark ? '#1e3a5f' : '#bae6fd',
+                  },
+                ]}>
+                <Text style={[styles.freshNoticeTitle, { color: isDark ? '#38bdf8' : '#0369a1' }]}>
+                  🌱 Fresh Start Heritage Account
+                </Text>
+                <Text style={[styles.freshNoticeDesc, { color: isDark ? '#94a3b8' : '#0c4a6e' }]}>
+                  Your account starts with 0 unlocked passes so you can tap real physical NFC tags across Lithuania to unlock stories!
+                </Text>
+              </View>
+
+              {/* Section 1 Card: Traveler Personal Details */}
+              <View
+                style={[
+                  styles.sectionCard,
+                  { backgroundColor: colors.cardBg, borderColor: colors.border },
+                ]}>
+                <View style={styles.sectionHeaderRow}>
+                  <View style={styles.sectionNumberCircle}>
+                    <Text style={styles.sectionNumberText}>1</Text>
+                  </View>
+                  <View>
+                    <Text style={[styles.sectionHeading, { color: colors.text }]}>
+                      Personal Information
+                    </Text>
+                    <Text style={[styles.sectionSubheading, { color: colors.textMuted }]}>
+                      Your name will appear on your Vilnius traveler certificate
+                    </Text>
+                  </View>
+                </View>
+
+                {/* First Name & Last Name (Side by Side) */}
+                <View style={styles.nameRow}>
+                  <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
+                    <Text style={[styles.inputLabel, { color: colors.text }]}>First Name *</Text>
+                    <View
+                      style={[
+                        styles.inputWrapper,
+                        { backgroundColor: colors.inputBg, borderColor: colors.border },
+                      ]}>
+                      <UserIcon size={18} color={colors.textMuted} />
+                      <TextInput
+                        style={[styles.textInput, { color: colors.text }]}
+                        placeholder="e.g. Allan"
+                        placeholderTextColor={colors.textMuted}
+                        value={firstName}
+                        onChangeText={setFirstName}
+                        autoCapitalize="words"
+                      />
+                    </View>
+                  </View>
+
+                  <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
+                    <Text style={[styles.inputLabel, { color: colors.text }]}>Last Name *</Text>
+                    <View
+                      style={[
+                        styles.inputWrapper,
+                        { backgroundColor: colors.inputBg, borderColor: colors.border },
+                      ]}>
+                      <UserIcon size={18} color={colors.textMuted} />
+                      <TextInput
+                        style={[styles.textInput, { color: colors.text }]}
+                        placeholder="e.g. Indrajith"
+                        placeholderTextColor={colors.textMuted}
+                        value={lastName}
+                        onChangeText={setLastName}
+                        autoCapitalize="words"
+                      />
+                    </View>
+                  </View>
+                </View>
+
+                {/* Date of Birth */}
+                <View style={[styles.inputGroup, { marginTop: 12 }]}>
+                  <View style={styles.inputLabelRow}>
+                    <Text style={[styles.inputLabel, { color: colors.text }]}>Date of Birth *</Text>
+                    <Text style={[styles.inputHint, { color: colors.textMuted }]}>
+                      (For age-tailored lore)
+                    </Text>
+                  </View>
+                  <View style={styles.dobRow}>
+                    {/* Day Input */}
+                    <View
+                      style={[
+                        styles.dobInputWrapper,
+                        { backgroundColor: colors.inputBg, borderColor: colors.border, flex: 1 },
+                      ]}>
+                      <CalendarIcon size={16} color={colors.textMuted} />
+                      <TextInput
+                        style={[styles.dobTextInput, { color: colors.text }]}
+                        placeholder="DD (1-31)"
+                        placeholderTextColor={colors.textMuted}
+                        value={birthDay}
+                        onChangeText={setBirthDay}
+                        keyboardType="number-pad"
+                        maxLength={2}
+                      />
+                    </View>
+
+                    {/* Month Selector */}
+                    <View
+                      style={[
+                        styles.dobInputWrapper,
+                        { backgroundColor: colors.inputBg, borderColor: colors.border, flex: 1.1 },
+                      ]}>
+                      <TextInput
+                        style={[styles.dobTextInput, { color: colors.text }]}
+                        placeholder="MM (01-12)"
+                        placeholderTextColor={colors.textMuted}
+                        value={birthMonth}
+                        onChangeText={setBirthMonth}
+                        keyboardType="number-pad"
+                        maxLength={2}
+                      />
+                    </View>
+
+                    {/* Year Input */}
+                    <View
+                      style={[
+                        styles.dobInputWrapper,
+                        { backgroundColor: colors.inputBg, borderColor: colors.border, flex: 1.2 },
+                      ]}>
+                      <TextInput
+                        style={[styles.dobTextInput, { color: colors.text }]}
+                        placeholder="YYYY (e.g. 1998)"
+                        placeholderTextColor={colors.textMuted}
+                        value={birthYear}
+                        onChangeText={setBirthYear}
+                        keyboardType="number-pad"
+                        maxLength={4}
+                      />
+                    </View>
+                  </View>
+                </View>
+              </View>
+
+              {/* Section 2 Card: Profile Picture & Avatar */}
+              <View
+                style={[
+                  styles.sectionCard,
+                  { backgroundColor: colors.cardBg, borderColor: colors.border },
+                ]}>
+                <View style={styles.sectionHeaderRow}>
+                  <View style={styles.sectionNumberCircle}>
+                    <Text style={styles.sectionNumberText}>2</Text>
+                  </View>
+                  <View>
+                    <Text style={[styles.sectionHeading, { color: colors.text }]}>
+                      Traveler Character
+                    </Text>
+                    <Text style={[styles.sectionSubheading, { color: colors.textMuted }]}>
+                      Choose a Vilnius avatar or upload your photo
+                    </Text>
+                  </View>
+                </View>
+
                 {/* Profile Picture Upload Section */}
                 <View style={styles.photoUploadSection}>
                   <Pressable
@@ -634,7 +864,7 @@ export function AuthScreen({ onSuccess }: AuthScreenProps) {
                       <Image source={{ uri: avatarUri }} style={styles.uploadedAvatarImage} />
                     ) : (
                       <View style={styles.emptyAvatarPlaceholder}>
-                        <CameraIcon size={30} color={WiseColors.forestGreen} />
+                        <CameraIcon size={24} color={WiseColors.forestGreen} />
                         <Text style={styles.avatarPlaceholderText}>Add Photo</Text>
                       </View>
                     )}
@@ -694,48 +924,29 @@ export function AuthScreen({ onSuccess }: AuthScreenProps) {
                     </ScrollView>
                   </View>
                 ) : null}
+              </View>
 
-                {/* First Name & Last Name (Side by Side) */}
-                <View style={styles.nameRow}>
-                  <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
-                    <Text style={[styles.inputLabel, { color: colors.text }]}>First Name *</Text>
-                    <View
-                      style={[
-                        styles.inputWrapper,
-                        { backgroundColor: colors.inputBg, borderColor: colors.border },
-                      ]}>
-                      <UserIcon size={17} color={colors.textMuted} />
-                      <TextInput
-                        style={[styles.textInput, { color: colors.text }]}
-                        placeholder="e.g. Allan"
-                        placeholderTextColor={colors.textMuted}
-                        value={firstName}
-                        onChangeText={setFirstName}
-                        autoCapitalize="words"
-                      />
-                    </View>
+              {/* Section 3 Card: Account Credentials */}
+              <View
+                style={[
+                  styles.sectionCard,
+                  { backgroundColor: colors.cardBg, borderColor: colors.border },
+                ]}>
+                <View style={styles.sectionHeaderRow}>
+                  <View style={styles.sectionNumberCircle}>
+                    <Text style={styles.sectionNumberText}>3</Text>
                   </View>
-
-                  <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
-                    <Text style={[styles.inputLabel, { color: colors.text }]}>Last Name *</Text>
-                    <View
-                      style={[
-                        styles.inputWrapper,
-                        { backgroundColor: colors.inputBg, borderColor: colors.border },
-                      ]}>
-                      <TextInput
-                        style={[styles.textInput, { color: colors.text, paddingLeft: 4 }]}
-                        placeholder="e.g. Indrajith"
-                        placeholderTextColor={colors.textMuted}
-                        value={lastName}
-                        onChangeText={setLastName}
-                        autoCapitalize="words"
-                      />
-                    </View>
+                  <View>
+                    <Text style={[styles.sectionHeading, { color: colors.text }]}>
+                      Account Credentials
+                    </Text>
+                    <Text style={[styles.sectionSubheading, { color: colors.textMuted }]}>
+                      Used to sign in and securely sync your Vilnius passes
+                    </Text>
                   </View>
                 </View>
 
-                {/* Email Field */}
+                {/* Email Address with Normal Mail Icon */}
                 <View style={styles.inputGroup}>
                   <Text style={[styles.inputLabel, { color: colors.text }]}>Email Address *</Text>
                   <View
@@ -757,72 +968,8 @@ export function AuthScreen({ onSuccess }: AuthScreenProps) {
                   </View>
                 </View>
 
-                {/* Date of Birth Field */}
-                <View style={styles.inputGroup}>
-                  <View style={styles.inputLabelRow}>
-                    <Text style={[styles.inputLabel, { color: colors.text }]}>Date of Birth *</Text>
-                    <Text style={[styles.inputHint, { color: colors.textMuted }]}>
-                      Required for passport
-                    </Text>
-                  </View>
-
-                  <View style={styles.dobRow}>
-                    {/* Day Input */}
-                    <View
-                      style={[
-                        styles.dobInputWrapper,
-                        { backgroundColor: colors.inputBg, borderColor: colors.border, flex: 0.9 },
-                      ]}>
-                      <CalendarIcon size={16} color={colors.textMuted} />
-                      <TextInput
-                        style={[styles.dobTextInput, { color: colors.text }]}
-                        placeholder="DD (1-31)"
-                        placeholderTextColor={colors.textMuted}
-                        value={birthDay}
-                        onChangeText={setBirthDay}
-                        keyboardType="number-pad"
-                        maxLength={2}
-                      />
-                    </View>
-
-                    {/* Month Selector */}
-                    <View
-                      style={[
-                        styles.dobInputWrapper,
-                        { backgroundColor: colors.inputBg, borderColor: colors.border, flex: 1.1 },
-                      ]}>
-                      <TextInput
-                        style={[styles.dobTextInput, { color: colors.text }]}
-                        placeholder="MM (01-12)"
-                        placeholderTextColor={colors.textMuted}
-                        value={birthMonth}
-                        onChangeText={setBirthMonth}
-                        keyboardType="number-pad"
-                        maxLength={2}
-                      />
-                    </View>
-
-                    {/* Year Input */}
-                    <View
-                      style={[
-                        styles.dobInputWrapper,
-                        { backgroundColor: colors.inputBg, borderColor: colors.border, flex: 1.2 },
-                      ]}>
-                      <TextInput
-                        style={[styles.dobTextInput, { color: colors.text }]}
-                        placeholder="YYYY (e.g. 1998)"
-                        placeholderTextColor={colors.textMuted}
-                        value={birthYear}
-                        onChangeText={setBirthYear}
-                        keyboardType="number-pad"
-                        maxLength={4}
-                      />
-                    </View>
-                  </View>
-                </View>
-
-                {/* Create Password */}
-                <View style={styles.inputGroup}>
+                {/* Create Password with Normal Lock Icon & Normal Eye Icon */}
+                <View style={[styles.inputGroup, { marginTop: 12 }]}>
                   <Text style={[styles.inputLabel, { color: colors.text }]}>Create Password *</Text>
                   <View
                     style={[
@@ -841,14 +988,19 @@ export function AuthScreen({ onSuccess }: AuthScreenProps) {
                     />
                     <Pressable
                       style={styles.eyeToggle}
-                      onPress={() => setShowPassword(!showPassword)}>
-                      <Text style={styles.eyeToggleText}>{showPassword ? '🙈' : '👁️'}</Text>
+                      onPress={() => setShowPassword(!showPassword)}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                      {showPassword ? (
+                        <EyeOffIcon size={20} color={colors.textMuted} />
+                      ) : (
+                        <EyeIcon size={20} color={colors.textMuted} />
+                      )}
                     </Pressable>
                   </View>
                 </View>
 
-                {/* Confirm Password */}
-                <View style={styles.inputGroup}>
+                {/* Confirm Password with Normal Lock Icon & Normal Eye Icon */}
+                <View style={[styles.inputGroup, { marginTop: 12 }]}>
                   <View style={styles.inputLabelRow}>
                     <Text style={[styles.inputLabel, { color: colors.text }]}>
                       Confirm Password *
@@ -879,8 +1031,13 @@ export function AuthScreen({ onSuccess }: AuthScreenProps) {
                     />
                     <Pressable
                       style={styles.eyeToggle}
-                      onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
-                      <Text style={styles.eyeToggleText}>{showConfirmPassword ? '🙈' : '👁️'}</Text>
+                      onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                      {showConfirmPassword ? (
+                        <EyeOffIcon size={20} color={colors.textMuted} />
+                      ) : (
+                        <EyeIcon size={20} color={colors.textMuted} />
+                      )}
                     </Pressable>
                   </View>
                 </View>
@@ -897,15 +1054,66 @@ export function AuthScreen({ onSuccess }: AuthScreenProps) {
                     {isLoading ? 'Creating Account...' : 'Create Account & Start Exploring'}
                   </Text>
                 </Pressable>
-              </View>
-            )}
 
-            {/* Bottom Footer Info */}
-            <Text style={[styles.termsText, { color: colors.textMuted }]}>
-              By continuing, you agree to TapTale’s Terms of Service and Privacy Policy. Unlocked
-              heritage stories will be tied to this traveler profile.
-            </Text>
-          </View>
+                {/* Switch back link */}
+                <View style={styles.switchRow}>
+                  <Text style={[styles.switchText, { color: colors.textMuted }]}>
+                    Already have an account?
+                  </Text>
+                  <Pressable
+                    onPress={() => {
+                      setAuthMode('sign_in');
+                      setErrorMessage(null);
+                    }}>
+                    <Text style={[styles.switchLink, { color: WiseColors.forestGreen }]}>
+                      Sign In
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+
+              {/* Quick Social Options */}
+              <View style={styles.socialQuickSection}>
+                <View style={styles.dividerRow}>
+                  <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+                  <Text style={[styles.dividerText, { color: colors.textMuted }]}>
+                    or connect with
+                  </Text>
+                  <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+                </View>
+
+                <View style={styles.socialRow}>
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.socialQuickBtn,
+                      { backgroundColor: '#000000' },
+                      pressed && { opacity: 0.85 },
+                    ]}
+                    onPress={handleAppleSignIn}>
+                    <AppleLogo size={18} color="#ffffff" />
+                    <Text style={[styles.socialQuickBtnText, { color: '#ffffff' }]}>Apple</Text>
+                  </Pressable>
+
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.socialQuickBtn,
+                      { backgroundColor: '#ffffff', borderColor: colors.border, borderWidth: 1 },
+                      pressed && { opacity: 0.85 },
+                    ]}
+                    onPress={handleGoogleSignIn}>
+                    <GoogleLogo size={18} />
+                    <Text style={[styles.socialQuickBtnText, { color: '#1f2937' }]}>Google</Text>
+                  </Pressable>
+                </View>
+              </View>
+
+              {/* Bottom Footer Info */}
+              <Text style={[styles.termsText, { color: colors.textMuted }]}>
+                By continuing, you agree to TapTale’s Terms of Service and Privacy Policy. Unlocked
+                heritage stories will be tied to this traveler profile.
+              </Text>
+            </View>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -1152,6 +1360,130 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
+  // Create Account Dedicated Page Top Bar & Header
+  pageTopBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 6,
+    paddingRight: 12,
+  },
+  backButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  stepBadge: {
+    backgroundColor: WiseColors.forestGreen,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  stepBadgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  createPageHeader: {
+    marginBottom: 18,
+  },
+  createPageTitle: {
+    fontSize: 26,
+    fontWeight: '800',
+    letterSpacing: -0.6,
+    marginBottom: 6,
+  },
+  createPageSubtitle: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+
+  // Section Card
+  sectionCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 18,
+    marginBottom: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 14,
+  },
+  sectionNumberCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: WiseColors.forestGreen,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sectionNumberText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  sectionHeading: {
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+  sectionSubheading: {
+    fontSize: 12,
+    marginTop: 1,
+  },
+
+  // Switch between Sign In / Sign Up
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 14,
+  },
+  switchText: {
+    fontSize: 13,
+  },
+  switchLink: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
+  // Quick social row on Create Account
+  socialQuickSection: {
+    marginTop: 4,
+    marginBottom: 10,
+  },
+  socialRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  socialQuickBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 12,
+    gap: 8,
+  },
+  socialQuickBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+
   // Error Banner
   errorBanner: {
     flexDirection: 'row',
@@ -1296,9 +1628,6 @@ const styles = StyleSheet.create({
   eyeToggle: {
     padding: 6,
   },
-  eyeToggleText: {
-    fontSize: 15,
-  },
 
   // Photo Upload Section
   photoUploadSection: {
@@ -1390,6 +1719,7 @@ const styles = StyleSheet.create({
   // Avatar Presets
   presetSection: {
     gap: 6,
+    marginTop: 8,
     marginBottom: 4,
   },
   presetHeader: {
@@ -1467,7 +1797,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 6,
+    marginTop: 10,
     shadowColor: WiseColors.forestGreen,
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,
@@ -1566,15 +1896,39 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
 
-  // Demo Button
-  demoButton: {
-    paddingVertical: 10,
+  // Create Account Prompt Card on Sign In
+  createAccountPromptCard: {
+    borderWidth: 1.5,
+    borderRadius: 18,
+    padding: 16,
+    marginTop: 16,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
   },
-  demoButtonText: {
-    color: WiseColors.forestGreen,
-    fontSize: 13,
-    fontWeight: '600',
+  createAccountPromptText: {
+    flex: 1,
+    gap: 2,
+  },
+  createPromptTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  createPromptSub: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  createPromptButton: {
+    backgroundColor: WiseColors.forestGreen,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  createPromptButtonText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
   },
 
   // Terms Footer

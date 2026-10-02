@@ -1,7 +1,7 @@
 import { Spot, SPOTS } from '@/constants/spots';
 import { UnlockRecord, UnlockService } from './unlock-storage';
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SafeStorage } from './safe-storage';
 
 export type AuthProvider = 'apple' | 'google' | 'email' | 'guest';
 
@@ -92,7 +92,7 @@ if (typeof window !== 'undefined' && window.localStorage) {
   }
 }
 
-AsyncStorage.getItem('@taptale_user_profile')
+SafeStorage.getItem('@taptale_user_profile')
   .then((saved) => {
     if (saved) {
       try {
@@ -102,7 +102,7 @@ AsyncStorage.getItem('@taptale_user_profile')
           parsed.email === 'traveler.apple@icloud.com'
         ) {
           currentProfile = { ...DEFAULT_USER };
-          AsyncStorage.removeItem('@taptale_user_profile');
+          SafeStorage.removeItem('@taptale_user_profile');
         } else {
           currentProfile = { ...DEFAULT_USER, ...parsed };
         }
@@ -113,14 +113,7 @@ AsyncStorage.getItem('@taptale_user_profile')
   .catch(() => {});
 
 function persistProfile() {
-  if (typeof window !== 'undefined' && window.localStorage) {
-    try {
-      window.localStorage.setItem('taptale_user_profile', JSON.stringify(currentProfile));
-    } catch (e) {
-      // Ignore
-    }
-  }
-  AsyncStorage.setItem('@taptale_user_profile', JSON.stringify(currentProfile)).catch(() => {});
+  SafeStorage.setItem('@taptale_user_profile', JSON.stringify(currentProfile)).catch(() => {});
   notify();
 }
 
@@ -391,7 +384,7 @@ export const UserService = {
         totalRequired: 1,
         currentCount: Math.min(1, visitedPlacesCount),
         isUnlocked: visitedPlacesCount >= 1,
-        unlockedAt: allRecords['vln-gediminas-tower']?.unlockedAt,
+        unlockedAt: allRecords['vln-cathedral-square']?.unlockedAt,
       },
       {
         id: 'badge-castle-master',

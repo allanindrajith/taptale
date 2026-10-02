@@ -20,7 +20,9 @@ try {
 export interface NfcScanResult {
   success: boolean;
   spot?: Spot;
+  alreadyUnlocked?: boolean;
   message: string;
+  hardwareMissing?: boolean;
 }
 
 let isNfcInitialized = false;
@@ -122,18 +124,6 @@ export const NfcService = {
    * and unlocks ONLY IF VALID. Never fake unlocks!
    */
   async scanPhysicalTag(targetSpot?: Spot): Promise<NfcScanResult> {
-    const supported = await this.isHardwareSupported();
-
-    if (!supported) {
-      return {
-        success: false,
-        message:
-          Platform.OS === 'ios'
-            ? 'Physical NFC scanning requires a physical iPhone device with CoreNFC hardware. On simulator, you can verify via physical tag deep-link or enter the plaque passkey.'
-            : 'NFC hardware not detected or not enabled on this device.',
-      };
-    }
-
     try {
       await this.init();
 
@@ -221,6 +211,8 @@ export const NfcService = {
         };
       }
 
+      const alreadyUnlocked = UnlockService.isUnlocked(matchedSpot.id);
+
       // Cryptographically validate the physical tag secret key
       const validation = UnlockService.validateAndUnlock(
         matchedSpot.id,
@@ -238,13 +230,21 @@ export const NfcService = {
       return {
         success: true,
         spot: matchedSpot,
-        message: `🎉 Physical NFC Tag Verified! 30-Day pass activated for ${matchedSpot.title.en}.`,
+        alreadyUnlocked,
+        message: alreadyUnlocked
+          ? `Welcome back to ${matchedSpot.title.en}! 30-Day access renewed.`
+          : `🎉 Physical NFC Tag Verified! 30-Day pass activated for ${matchedSpot.title.en}.`,
       };
     } catch (err: any) {
       await this.cancelScan();
+      const errMsg = err?.message || String(err || '');
+      const isUserCancel = errMsg.toLowerCase().includes('cancel') || errMsg.toLowerCase().includes('user');
       return {
         success: false,
-        message: err?.message || 'NFC scanning was cancelled or failed.',
+        hardwareMissing: !isUserCancel,
+        message: isUserCancel
+          ? 'NFC scan was cancelled.'
+          : (errMsg || 'NFC reading session could not be started in this build.'),
       };
     }
   },

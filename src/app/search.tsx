@@ -26,12 +26,13 @@ import {
 import { Spacing, WiseColors } from '@/constants/theme';
 import { LocationService, LocationState } from '@/services/location-service';
 import { UnlockService } from '@/services/unlock-storage';
+import { useLanguage } from '@/hooks/use-language';
 
 export default function SearchScreen() {
   const insets = useSafeAreaInsets();
   const topInset = Math.max(insets.top, Platform.OS === 'ios' ? 56 : 24);
 
-  const [language, setLanguage] = useState<AppLanguage>('en');
+  const { language } = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCity, setSelectedCity] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -134,26 +135,17 @@ export default function SearchScreen() {
                 ? 'Raskite istorines vietas, pilis ir šventoves'
                 : 'Find historical landmarks, castles, and sacred sites'}
             </Text>
-            {/* Live GPS / Location indicator */}
+            {/* Live Location indicator */}
             <View style={styles.locationPillRow}>
-              <View style={[styles.locationIndicatorDot, locationState.isRealGps && styles.locationIndicatorDotLive]} />
+              <View style={[styles.locationIndicatorDot, styles.locationIndicatorDotLive]} />
               <Text style={styles.locationPillText}>
-                {locationState.isRealGps ? '🛰️ Real-Time GPS' : `📍 ${locationState.label}`}
-              </Text>
-              <Text style={styles.locationCoordsMini}>
-                ({locationState.latitude.toFixed(3)}°, {locationState.longitude.toFixed(3)}°)
+                📍 {locationState.district && !locationState.cityName?.includes(locationState.district)
+                  ? `${locationState.district}, ${locationState.cityName}`
+                  : (locationState.cityName || locationState.label || 'Vilnius, Lithuania')}
               </Text>
             </View>
           </View>
 
-          {/* Language Toggle */}
-          <Pressable
-            style={styles.langToggle}
-            onPress={() => setLanguage(language === 'en' ? 'lt' : 'en')}>
-            <Text style={styles.langToggleText}>
-              {language === 'en' ? '🇬🇧 EN' : '🇱🇹 LT'}
-            </Text>
-          </Pressable>
         </View>
 
         {/* Search Bar Input */}

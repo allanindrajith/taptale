@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   Alert,
   Image,
+  Platform,
   Pressable,
   SafeAreaView,
   StyleSheet,
@@ -13,9 +14,11 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SPOTS, Spot, resolveText } from '@/constants/spots';
 import { Rounded, Spacing, WiseColors } from '@/constants/theme';
 import { UnlockService } from '@/services/unlock-storage';
+import { useLanguage } from '@/hooks/use-language';
 
 export default function UnlockScreen() {
   const router = useRouter();
+  const { language } = useLanguage();
   const { spot: spotId, key } = useLocalSearchParams<{ spot?: string; key?: string }>();
 
   const [validationResult, setValidationResult] = useState<{
@@ -69,6 +72,55 @@ export default function UnlockScreen() {
   }, [spotId, key]);
 
   const targetSpot = validationResult.spot;
+  const isWeb = Platform.OS === 'web';
+
+  // Detect Mobile OS if opened in a web browser
+  const [deviceOS, setDeviceOS] = useState<'ios' | 'android' | 'other'>('other');
+
+  useEffect(() => {
+    if (isWeb && typeof window !== 'undefined') {
+      const ua = navigator.userAgent || navigator.vendor || (window as any).opera || '';
+      if (/android/i.test(ua)) {
+        setDeviceOS('android');
+      } else if (/iPad|iPhone|iPod/.test(ua) && !(window as any).MSStream) {
+        setDeviceOS('ios');
+      } else {
+        setDeviceOS('other');
+      }
+
+      // If spot and key are present, attempt to launch installed native app via custom scheme
+      if (spotId && key) {
+        const nativeUri = `taptale://unlock?spot=${encodeURIComponent(spotId)}&key=${encodeURIComponent(key)}`;
+        // Small delay to allow page render before triggering intent
+        const timer = setTimeout(() => {
+          try {
+            window.location.href = nativeUri;
+          } catch (e) {}
+        }, 400);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [isWeb, spotId, key]);
+
+  const handleOpenNativeApp = () => {
+    if (!spotId || !key) return;
+    const nativeUri = `taptale://unlock?spot=${encodeURIComponent(spotId)}&key=${encodeURIComponent(key)}`;
+    if (isWeb && typeof window !== 'undefined') {
+      window.location.href = nativeUri;
+    }
+  };
+
+  const handleOpenStore = (store: 'ios' | 'android') => {
+    if (isWeb && typeof window !== 'undefined') {
+      if (store === 'ios') {
+        // Direct App Store link (or search fallback)
+        window.open('https://apps.apple.com/app/taptale/id6470000000', '_blank');
+      } else {
+        // Direct Google Play Store link
+        window.open('https://play.google.com/store/apps/details?id=com.allanindrajith.taptale', '_blank');
+      }
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -85,6 +137,15 @@ export default function UnlockScreen() {
 
         {validationResult.status === 'valid' && targetSpot && (
           <View style={styles.card}>
+            {/* Show landmark hero image if in web browser */}
+            {isWeb && targetSpot.imageUrl && (
+              <Image
+                source={typeof targetSpot.imageUrl === 'string' ? { uri: targetSpot.imageUrl } : targetSpot.imageUrl}
+                style={styles.heroImage}
+                resizeMode="cover"
+              />
+            )}
+
             <View style={styles.successIconBadge}>
               <Text style={styles.badgeEmoji}>🎉</Text>
             </View>
@@ -94,11 +155,14 @@ export default function UnlockScreen() {
               <Text style={styles.statusPillText}>PHYSICAL NFC VERIFIED</Text>
             </View>
 
-            <Text style={styles.title}>30-Day Pass Activated!</Text>
-            <Text style={styles.spotTitle}>{targetSpot.title.en}</Text>
+            <Text style={styles.title}>
+              {language === 'lt' ? '30 dienų leidimas aktyvuotas!' : '30-Day Pass Activated!'}
+            </Text>
+            <Text style={styles.spotTitle}>{resolveText(targetSpot.title, language)}</Text>
             <Text style={styles.subtitle}>
-              Physical tag signature matches monument security key. Full story, lore, and audio guide
-              are unlocked for 30 days!
+              {isWeb
+                ? 'You discovered this authentic monument! Open TapTale to enjoy the audio story, interactive 3D map, and archival lore.'
+                : 'Physical tag signature matches monument security key. Full story, lore, and audio guide are unlocked for 30 days!'}
             </Text>
 
             <View style={styles.infoRow}>
@@ -109,14 +173,56 @@ export default function UnlockScreen() {
               <Text style={styles.infoLabel}>Location:</Text>
               <Text style={styles.infoValue}>{targetSpot.cityID.toUpperCase()}</Text>
             </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Audio Guide:</Text>
+              <Text style={styles.infoValue}>{targetSpot.audioGuide.duration} Narrated</Text>
+            </View>
 
-            <Pressable
-              style={styles.primaryBtn}
-              onPress={() => {
-                router.replace('/');
-              }}>
-              <Text style={styles.primaryBtnText}>Start Exploring</Text>
-            </Pressable>
+            {/* If viewed in Web Browser on a Mobile Phone */}
+            {isWeb ? (
+              <View style={styles.storeSection}>
+                <Text style={styles.storePrompt}>Experience this story in the TapTale app:</Text>
+
+                {/* Primary Button: Open App if already installed */}
+                <Pressable style={styles.primaryBtn} onPress={handleOpenNativeApp}>
+                  <Text style={styles.primaryBtnText}>📲 Open in TapTale App</Text>
+                </Pressable>
+
+                {/* Dynamic Store Buttons based on User Device OS */}
+                {(deviceOS === 'ios' || deviceOS === 'other') && (
+                  <Pressable style={styles.appStoreBtn} onPress={() => handleOpenStore('ios')}>
+                    <Text style={styles.storeBtnIcon}>🍎</Text>
+                    <View style={styles.storeBtnTextContainer}>
+                      <Text style={styles.storeBtnSub}>Download on the</Text>
+                      <Text style={styles.storeBtnTitle}>Apple App Store</Text>
+                    </View>
+                  </Pressable>
+                )}
+
+                {(deviceOS === 'android' || deviceOS === 'other') && (
+                  <Pressable style={styles.playStoreBtn} onPress={() => handleOpenStore('android')}>
+                    <Text style={styles.storeBtnIcon}>🤖</Text>
+                    <View style={styles.storeBtnTextContainer}>
+                      <Text style={styles.storeBtnSub}>GET IT ON</Text>
+                      <Text style={styles.storeBtnTitle}>Google Play</Text>
+                    </View>
+                  </Pressable>
+                )}
+              </View>
+            ) : (
+              /* Native App Experience */
+              <Pressable
+                style={styles.primaryBtn}
+                onPress={() => {
+                  router.replace({ pathname: '/', params: { spot: targetSpot.id } });
+                }}>
+                <Text style={styles.primaryBtnText}>
+                  {language === 'lt'
+                    ? `Peržiūrėti ${resolveText(targetSpot.title, language)} istoriją →`
+                    : `Visit ${resolveText(targetSpot.title, language)} Story →`}
+                </Text>
+              </Pressable>
+            )}
           </View>
         )}
 
@@ -141,13 +247,19 @@ export default function UnlockScreen() {
               Physical unlocking requires scanning an authentic TapTale plaque at the physical site, or entering the engraved passkey manually.
             </Text>
 
-            <Pressable
-              style={styles.secondaryBtn}
-              onPress={() => {
-                router.replace('/');
-              }}>
-              <Text style={styles.secondaryBtnText}>Back to Map</Text>
-            </Pressable>
+            {isWeb ? (
+              <Pressable style={styles.primaryBtn} onPress={handleOpenNativeApp}>
+                <Text style={styles.primaryBtnText}>Open TapTale App</Text>
+              </Pressable>
+            ) : (
+              <Pressable
+                style={styles.secondaryBtn}
+                onPress={() => {
+                  router.replace('/');
+                }}>
+                <Text style={styles.secondaryBtnText}>Back to Map</Text>
+              </Pressable>
+            )}
           </View>
         )}
       </View>
@@ -319,5 +431,67 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: WiseColors.ink,
+  },
+  heroImage: {
+    width: '100%',
+    height: 180,
+    borderRadius: Rounded.lg,
+    marginBottom: Spacing.md,
+  },
+  storeSection: {
+    width: '100%',
+    marginTop: Spacing.md,
+    paddingTop: Spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#e2e8f0',
+    alignItems: 'center',
+    gap: 10,
+  },
+  storePrompt: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: WiseColors.body,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  appStoreBtn: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#000000',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: Rounded.pill,
+    gap: 12,
+  },
+  playStoreBtn: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0f172a',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: Rounded.pill,
+    gap: 12,
+  },
+  storeBtnIcon: {
+    fontSize: 22,
+  },
+  storeBtnTextContainer: {
+    alignItems: 'flex-start',
+  },
+  storeBtnSub: {
+    fontSize: 10,
+    color: '#94a3b8',
+    textTransform: 'uppercase',
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
+  storeBtnTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#ffffff',
   },
 });

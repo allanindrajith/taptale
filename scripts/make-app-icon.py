@@ -1,4 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+import subprocess
+import os
+
+svg_content = """<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <defs>
     <!-- Background Gradient: Deep Forest Green matching WiseColors.primary -->
     <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -76,3 +79,68 @@
   <!-- Clean Bottom Accent Pill -->
   <rect x="442" y="868" width="140" height="10" rx="5" fill="#FFFFFF" opacity="0.4"/>
 </svg>
+"""
+
+svg_path = "scripts/app-icon.svg"
+with open(svg_path, "w") as f:
+    f.write(svg_content)
+
+print("Saved SVG.")
+
+# 1. Generate main 1024x1024 icon.png
+icon_png = "assets/images/icon.png"
+subprocess.run(["sips", "-s", "format", "png", svg_path, "--out", icon_png], check=True)
+print(f"Generated {icon_png}")
+
+# 2. Generate iOS AppIcon.appiconset
+ios_icon_dir = "ios/taptale/Images.xcassets/AppIcon.appiconset"
+os.makedirs(ios_icon_dir, exist_ok=True)
+ios_app_icon = os.path.join(ios_icon_dir, "App-Icon-1024x1024@1x.png")
+subprocess.run(["sips", "-s", "format", "png", svg_path, "--out", ios_app_icon], check=True)
+print(f"Generated {ios_app_icon}")
+
+# Update Contents.json in AppIcon.appiconset
+contents_json = """{
+  "images" : [
+    {
+      "filename" : "App-Icon-1024x1024@1x.png",
+      "idiom" : "universal",
+      "platform" : "ios",
+      "size" : "1024x1024"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}
+"""
+with open(os.path.join(ios_icon_dir, "Contents.json"), "w") as f:
+    f.write(contents_json)
+print("Updated iOS AppIcon Contents.json")
+
+# 3. Generate Android Adaptive Icons
+android_foreground = "assets/images/android-icon-foreground.png"
+android_bg = "assets/images/android-icon-background.png"
+subprocess.run(["sips", "-s", "format", "png", svg_path, "--out", android_foreground], check=True)
+
+# Generate simple background for Android
+bg_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024">
+  <rect width="1024" height="1024" fill="#1d5c38"/>
+</svg>"""
+bg_svg_path = "scripts/android-bg.svg"
+with open(bg_svg_path, "w") as f:
+    f.write(bg_svg)
+subprocess.run(["sips", "-s", "format", "png", bg_svg_path, "--out", android_bg], check=True)
+os.remove(bg_svg_path)
+print("Generated Android icons")
+
+# 4. Generate splash icon
+splash_icon = "assets/images/splash-icon.png"
+subprocess.run(["sips", "-z", "256", "256", icon_png, "--out", splash_icon], check=True)
+print(f"Generated {splash_icon}")
+
+# 5. Generate favicon
+favicon = "assets/images/favicon.png"
+subprocess.run(["sips", "-z", "64", "64", icon_png, "--out", favicon], check=True)
+print(f"Generated {favicon}")

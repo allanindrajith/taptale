@@ -30,12 +30,14 @@ import {
   DEMO_ACCOUNT,
 } from '@/services/user-storage';
 import { UnlockService } from '@/services/unlock-storage';
+import { AppleLogo, GoogleLogo, MailIcon } from '@/components/brand-icons';
+import { useLanguage } from '@/hooks/use-language';
 
 export default function AccountScreen() {
   const insets = useSafeAreaInsets();
   const topInset = Math.max(insets.top, Platform.OS === 'ios' ? 56 : 24);
 
-  const [language, setLanguage] = useState<AppLanguage>('en');
+  const { language, setLanguage } = useLanguage();
   const [profile, setProfile] = useState<UserProfile>(UserService.getProfile());
   const [achievements, setAchievements] = useState(UserService.getAchievements());
   const [timeline, setTimeline] = useState<TimelineEntry[]>(UserService.getVisitTimeline());
@@ -113,24 +115,23 @@ export default function AccountScreen() {
   }
 
   function handleResetDemo() {
-    const isDemo = profile.email.toLowerCase() === DEMO_ACCOUNT.email.toLowerCase();
     Alert.alert(
-      language === 'lt' ? 'Išvalyti Leidimus' : 'Reset Passes',
+      language === 'lt' ? 'Atstatyti leidimus' : 'Reset Passes',
       language === 'lt'
-        ? 'Ar tikrai norite atstatyti leidimus į pradinę paskyros būseną?'
-        : 'Reset all unlocked passes back to your account starting state?',
+        ? 'Palikti tik Katedros aikštę atrakintą, o visas kitas 6 vietas užrakinti NFC testavimui?'
+        : 'Keep only Cathedral Square unlocked and lock all other 6 places to test NFC tags?',
       [
         { text: language === 'lt' ? 'Atšaukti' : 'Cancel', style: 'cancel' },
         {
           text: language === 'lt' ? 'Atstatyti' : 'Reset',
           style: 'destructive',
-          onPress: () => {
-            UnlockService.switchUser(profile.email, isDemo);
+          onPress: async () => {
+            await UnlockService.resetEverything();
             refreshData();
             showBanner(
-              isDemo
-                ? 'Demo passes reloaded (4 sample passes).'
-                : 'All passes reset. Ready for physical NFC tags!'
+              language === 'lt'
+                ? 'Katedros aikštė atrakinta. Kitos 6 vietos užrakintos ir paruoštos NFC testavimui!'
+                : 'Cathedral Square kept unlocked. Other 6 spots locked & ready for NFC testing!'
             );
           },
         },
@@ -160,14 +161,6 @@ export default function AccountScreen() {
             </Text>
           </View>
 
-          {/* Language Toggle Pill */}
-          <Pressable
-            style={styles.langToggle}
-            onPress={() => setLanguage(language === 'en' ? 'lt' : 'en')}>
-            <Text style={styles.langToggleText}>
-              {language === 'en' ? '🇬🇧 EN' : '🇱🇹 LT'}
-            </Text>
-          </Pressable>
         </View>
 
         {/* Temporary Banner Message */}
@@ -268,17 +261,20 @@ export default function AccountScreen() {
 
             <View style={styles.connectButtonsGrid}>
               <Pressable style={styles.appleBtn} onPress={handleConnectApple}>
-                <Text style={styles.appleBtnText}>🍏 Continue with Apple</Text>
+                <AppleLogo size={18} color="#ffffff" />
+                <Text style={styles.appleBtnText}>Continue with Apple</Text>
               </Pressable>
 
               <Pressable style={styles.googleBtn} onPress={handleConnectGoogle}>
-                <Text style={styles.googleBtnText}>🌐 Continue with Google</Text>
+                <GoogleLogo size={18} />
+                <Text style={styles.googleBtnText}>Continue with Google</Text>
               </Pressable>
 
               <Pressable
                 style={styles.emailBtn}
                 onPress={() => setEmailModalVisible(true)}>
-                <Text style={styles.emailBtnText}>✉️ Continue with Email</Text>
+                <MailIcon size={18} color={WiseColors.primary} />
+                <Text style={styles.emailBtnText}>Continue with Email</Text>
               </Pressable>
             </View>
           </View>
@@ -598,12 +594,12 @@ export default function AccountScreen() {
             <View style={styles.settingRow}>
               <View style={{ flex: 1, paddingRight: 16 }}>
                 <Text style={styles.settingLabel}>
-                  {language === 'lt' ? 'Išvalyti / Atkurti Demonstraciją' : 'Reset Demo Passes'}
+                  {language === 'lt' ? 'Atstatyti Leidimus' : 'Reset Passes (Test NFC)'}
                 </Text>
                 <Text style={styles.settingSub}>
                   {language === 'lt'
-                    ? 'Grąžinti pradinę būseną testavimui'
-                    : 'Revert unlocked passes to default for testing'}
+                    ? 'Palikti Katedros aikštę atrakintą, o kitas 6 vietas užrakinti NFC testui'
+                    : 'Keep Cathedral Square unlocked and lock other 6 places for NFC testing'}
                 </Text>
               </View>
               <Pressable style={styles.resetBtn} onPress={handleResetDemo}>
@@ -1058,7 +1054,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#000000',
     borderRadius: 12,
     paddingVertical: 12,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
   },
   appleBtnText: {
     color: '#ffffff',
@@ -1069,7 +1068,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderRadius: 12,
     paddingVertical: 12,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
     borderWidth: 1,
     borderColor: '#d1d5db',
   },
@@ -1082,7 +1084,10 @@ const styles = StyleSheet.create({
     backgroundColor: WiseColors.primaryPale,
     borderRadius: 12,
     paddingVertical: 12,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
     borderWidth: 1,
     borderColor: WiseColors.forestBorder,
   },

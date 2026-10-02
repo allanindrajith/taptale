@@ -14,6 +14,7 @@ import { AppLanguage, resolveText } from '@/constants/spots';
 import { Spacing, WiseColors } from '@/constants/theme';
 import { UnlockService } from '@/services/unlock-storage';
 import { NfcService } from '@/services/nfc-service';
+import { useLanguage } from '@/hooks/use-language';
 
 interface StepItem {
   number: string;
@@ -127,7 +128,7 @@ export default function HelpScreen() {
   const insets = useSafeAreaInsets();
   const topInset = Math.max(insets.top, Platform.OS === 'ios' ? 56 : 24);
 
-  const [language, setLanguage] = useState<AppLanguage>('en');
+  const { language } = useLanguage();
   const [expandedFaqIndex, setExpandedFaqIndex] = useState<number | null>(0);
   const [simulatedTapped, setSimulatedTapped] = useState(false);
   const [simulatorStatus, setSimulatorStatus] = useState<string | null>(null);
@@ -174,15 +175,6 @@ export default function HelpScreen() {
                 : 'Guide to physical NFC tags, 30-day passes & badges'}
             </Text>
           </View>
-
-          {/* Language Toggle */}
-          <Pressable
-            style={styles.langToggle}
-            onPress={() => setLanguage(language === 'en' ? 'lt' : 'en')}>
-            <Text style={styles.langToggleText}>
-              {language === 'en' ? '🇬🇧 EN' : '🇱🇹 LT'}
-            </Text>
-          </Pressable>
         </View>
 
         {/* Hero Interactive Banner */}

@@ -9,13 +9,11 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "com.allanindrajith.taptale",
-      "icon": "./assets/expo.icon",
+      "icon": "./assets/images/icon.png",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "TapTale uses your location to calculate real-time distance and travel time to heritage spots across Lithuania.",
-        "NFCReaderUsageDescription": "TapTale uses NFC to scan physical heritage plaques at monuments across Lithuania to unlock historical stories and passes."
-      },
-      "entitlements": {
-        "com.apple.developer.nfc.readersession.formats": ["TAG", "NDEF"]
+        "NFCReaderUsageDescription": "TapTale uses NFC to scan physical heritage plaques at monuments across Lithuania to unlock historical stories and passes.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -26,7 +24,9 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "permissions": ["android.permission.NFC"],
+      "permissions": [
+        "android.permission.NFC"
+      ],
       "predictiveBackGestureEnabled": false
     },
     "web": {

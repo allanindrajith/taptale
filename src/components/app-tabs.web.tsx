@@ -14,24 +14,27 @@ import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
 import { Colors, MaxContentWidth, Spacing } from '@/constants/theme';
+import { useLanguage } from '@/hooks/use-language';
 
 export default function AppTabs() {
+  const { language } = useLanguage();
+
   return (
     <Tabs>
       <TabSlot style={{ height: '100%' }} />
       <TabList asChild>
         <CustomTabList>
           <TabTrigger name="home" href="/" asChild>
-            <TabButton>Home</TabButton>
+            <TabButton>{language === 'lt' ? 'Pradžia' : 'Home'}</TabButton>
           </TabTrigger>
           <TabTrigger name="search" href="/search" asChild>
-            <TabButton>Search</TabButton>
+            <TabButton>{language === 'lt' ? 'Paieška' : 'Search'}</TabButton>
           </TabTrigger>
           <TabTrigger name="me" href="/me" asChild>
-            <TabButton>Me</TabButton>
+            <TabButton>{language === 'lt' ? 'Aš' : 'Me'}</TabButton>
           </TabTrigger>
           <TabTrigger name="help" href="/help" asChild>
-            <TabButton>Help</TabButton>
+            <TabButton>{language === 'lt' ? 'Gidas' : 'Help'}</TabButton>
           </TabTrigger>
         </CustomTabList>
       </TabList>
@@ -55,7 +58,7 @@ export function TabButton({ children, isFocused, ...props }: TabTriggerSlotProps
 
 export function CustomTabList(props: TabListProps) {
   const scheme = useColorScheme();
-  const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
+  const colors = Colors[scheme === 'dark' ? 'dark' : 'light'];
 
   return (
     <View {...props} style={styles.tabListContainer}>

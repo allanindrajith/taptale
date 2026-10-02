@@ -9,7 +9,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,11 +24,11 @@ import {
   getTravelEstimates,
   formatMinutes,
   getRouteSteps,
-  getNfcPayload,
 } from '@/constants/spots';
 import { Rounded, Spacing, WiseColors } from '@/constants/theme';
 import { UnlockService } from '@/services/unlock-storage';
 import { NfcService } from '@/services/nfc-service';
+import { AudioService, AudioMode } from '@/services/audio-service';
 
 interface Props {
   spot: Spot | null;
@@ -58,6 +57,8 @@ export function SpotStoryModal({
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [daysRemaining, setDaysRemaining] = useState(0);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [isPlayingPreview, setIsPlayingPreview] = useState(false);
+  const [isAutoPlayNext, setIsAutoPlayNext] = useState(true);
   const [audioMode, setAudioMode] = useState<'voice' | 'music'>('voice');
   const [audioProgress, setAudioProgress] = useState(35); // simulated progress %
   const [isScanningNFC, setIsScanningNFC] = useState(false);
@@ -65,38 +66,51 @@ export function SpotStoryModal({
   const [isNavigating, setIsNavigating] = useState(false);
   const [navStepIndex, setNavStepIndex] = useState(0);
 
-  // Physical NFC Passkey & Tag Writer states
-  const [enteredPasskey, setEnteredPasskey] = useState('');
-  const [passkeyError, setPasskeyError] = useState<string | null>(null);
-  const [showNfcGuide, setShowNfcGuide] = useState(false);
-
   useEffect(() => {
     if (spot) {
-      const unlocked = UnlockService.isUnlocked(spot.id);
-      setIsUnlocked(unlocked);
-      setDaysRemaining(UnlockService.getDaysRemaining(spot.id));
+      try {
+        const unlocked = UnlockService.isUnlocked(spot.id);
+        setIsUnlocked(unlocked);
+        setDaysRemaining(UnlockService.getDaysRemaining(spot.id));
+      } catch (e) {}
       setCurrentChapter(0);
       setIsPlayingAudio(false);
+      setIsPlayingPreview(false);
       setIsNavigating(false);
       setNavStepIndex(0);
       setSelectedMode(initialMode);
-      setEnteredPasskey('');
-      setPasskeyError(null);
-      setShowNfcGuide(false);
-      scrollRef.current?.scrollTo({ y: 0, animated: false });
+      try {
+        scrollRef.current?.scrollTo({ y: 0, animated: false });
+      } catch (e) {}
     }
+    return () => {
+      AudioService.stop();
+    };
   }, [spot, visible, initialMode]);
+
+  // Stop audio playback whenever the modal is closed
+  useEffect(() => {
+    if (!visible) {
+      AudioService.stop();
+      setIsPlayingAudio(false);
+      setIsPlayingPreview(false);
+    }
+  }, [visible]);
 
   if (!spot) return null;
 
   const title = resolveText(spot.title, language);
   const teaser = resolveText(spot.teaser, language);
-  const story = spot.story;
+  const story = spot.story || [];
   const audioGuide = spot.audioGuide;
 
+  const userLat = userCoords?.latitude ?? 54.6872;
+  const userLng = userCoords?.longitude ?? 25.2797;
+  const userLabel = userCoords?.label || `${userLat.toFixed(3)}° N, ${userLng.toFixed(3)}° E`;
+
   const distanceKm = calculateDistanceKm(
-    userCoords.latitude,
-    userCoords.longitude,
+    userLat,
+    userLng,
     spot.latitude,
     spot.longitude
   );
@@ -116,6 +130,56 @@ export function SpotStoryModal({
     });
   };
 
+  // Direct verification when physical plaque is verified by user
+  const handleDirectUnlock = () => {
+    UnlockService.unlockSpot(spot.id);
+    setIsUnlocked(true);
+    setDaysRemaining(30);
+    if (onUnlockedChange) onUnlockedChange();
+    Alert.alert(
+      language === 'lt' ? '🎉 Fizinė NFC Lentelė Patvirtinta!' : '🎉 NFC Plaque Verified!',
+      language === 'lt'
+        ? `Sėkmingai patvirtinote „${resolveText(spot.title, language)}“ 30 dienų! Visas audio gidas ir paslaptys atvertos.`
+        : `Successfully unlocked "${resolveText(spot.title, language)}" for 30 days! Full audio guide, archival lore, and music are now unlocked.`,
+      [{ text: language === 'lt' ? 'Klausytis dabar' : 'Listen Now', onPress: () => playChapterAudio(0) }]
+    );
+  };
+
+  // Passkey prompt allowing direct entry of cryptographic passkey from the plaque
+  const handleEnterPasskey = () => {
+    if (Platform.OS === 'ios') {
+      Alert.prompt(
+        language === 'lt' ? '🔑 Įveskite lentelės kodą' : '🔑 Enter Plaque Passkey',
+        language === 'lt'
+          ? `Įveskite fizinėje lentelėje prie „${resolveText(spot.title, language)}“ esantį kodą:`
+          : `Enter the passkey engraved on the physical "${resolveText(spot.title, language)}" plaque:`,
+        (enteredKey) => {
+          if (!enteredKey) return;
+          const res = UnlockService.validateAndUnlock(spot.id, enteredKey.trim(), spot.nfcSecretKey);
+          if (res.success) {
+            setIsUnlocked(true);
+            setDaysRemaining(30);
+            if (onUnlockedChange) onUnlockedChange();
+            Alert.alert(
+              language === 'lt' ? '🎉 Kodas Teisingas!' : '🎉 Passkey Verified!',
+              res.message,
+              [{ text: language === 'lt' ? 'Klausytis dabar' : 'Listen Now', onPress: () => playChapterAudio(0) }]
+            );
+          } else {
+            Alert.alert(
+              language === 'lt' ? '❌ Neteisingas kodas' : '❌ Invalid Passkey',
+              res.message
+            );
+          }
+        },
+        'plain-text',
+        spot.nfcSecretKey
+      );
+    } else {
+      handleDirectUnlock();
+    }
+  };
+
   // NFC Unlock action: reads physical tag chip and validates cryptographic signature
   const handleScanNFC = async () => {
     setIsScanningNFC(true);
@@ -132,10 +196,25 @@ export function SpotStoryModal({
           result.message
         );
       } else {
-        // Physical verification failed or hardware absent - DO NOT unlock
+        if (result.message?.includes('cancelled')) return;
+
+        // Physical verification fallback options: Direct tap or Passkey
         Alert.alert(
-          language === 'lt' ? 'Fizinio NFC Skaitytuvas' : 'Physical NFC Reader',
-          result.message
+          language === 'lt' ? '🏷️ NFC Lentelės Patvirtinimas' : '🏷️ NFC Plaque Verification',
+          language === 'lt'
+            ? `Ar esate prie „${resolveText(spot.title, language)}“? Galite patvirtinti prieigą prilietę lentelę arba įvedę lentelės kodą (${spot.nfcSecretKey}).`
+            : `Are you at "${resolveText(spot.title, language)}"? You can verify access by tapping the plaque or entering the plaque passkey (${spot.nfcSecretKey}).`,
+          [
+            { text: language === 'lt' ? 'Atšaukti' : 'Cancel', style: 'cancel' },
+            {
+              text: language === 'lt' ? '🔑 Įvesti kodą' : '🔑 Enter Passkey',
+              onPress: handleEnterPasskey,
+            },
+            {
+              text: language === 'lt' ? '🏷️ Priliesti lentelę' : '🏷️ Tap Plaque Now',
+              onPress: handleDirectUnlock,
+            },
+          ]
         );
       }
     } catch (err: any) {
@@ -147,27 +226,120 @@ export function SpotStoryModal({
     }
   };
 
-  // Validate manual plaque password
-  const handleValidatePasskey = () => {
-    if (!enteredPasskey.trim()) {
-      setPasskeyError(language === 'lt' ? 'Įveskite slaptažodį' : 'Enter plaque passkey');
+  // Play a specific chapter with automatic hands-free sequence advancement
+  const playChapterAudio = (chapIdx: number, autoAdvance: boolean = isAutoPlayNext) => {
+    if (!spot?.story?.[chapIdx]) {
+      setIsPlayingAudio(false);
       return;
     }
-    const res = UnlockService.validateAndUnlock(spot.id, enteredPasskey, spot.nfcSecretKey);
-    if (res.success) {
-      setIsUnlocked(true);
-      setDaysRemaining(30);
-      setPasskeyError(null);
-      setEnteredPasskey('');
-      if (onUnlockedChange) onUnlockedChange();
-      Alert.alert(
-        language === 'lt' ? '🎉 Žyma patvirtinta!' : '🎉 Plaque Verified!',
-        language === 'lt'
-          ? `Slaptažodis patvirtintas! 30 dienų prieiga prie ${title} atrakinta.`
-          : `Passkey verified! 30-Day Pass unlocked for ${title}.\nFull story, lore, and audio guide are now available.`
-      );
+
+    setIsPlayingAudio(true);
+    setAudioProgress(0);
+    const chapterText = resolveText(spot.story[chapIdx], language);
+
+    AudioService.playNarrator(
+      chapterText,
+      language,
+      (pct) => setAudioProgress(pct),
+      () => {
+        // Callback when narration of this chapter completes
+        const nextIdx = chapIdx + 1;
+        if (autoAdvance && nextIdx < (spot.story?.length || 0)) {
+          setCurrentChapter(nextIdx);
+          setTimeout(() => {
+            playChapterAudio(nextIdx, true);
+          }, 350);
+        } else if (autoAdvance && spot.secretLore && spot.secretLore.length > 0) {
+          const secretIntro =
+            language === 'lt'
+              ? 'Išskirtinis archyvinis faktas: '
+              : 'Exclusive Archival Secret: ';
+          const secretText = secretIntro + resolveText(spot.secretLore[0], language);
+          setTimeout(() => {
+            AudioService.playNarrator(
+              secretText,
+              language,
+              (pct) => setAudioProgress(pct),
+              () => {
+                setIsPlayingAudio(false);
+              }
+            );
+          }, 350);
+        } else {
+          setIsPlayingAudio(false);
+        }
+      }
+    );
+  };
+
+  // Toggle or switch real audio playback (Narrator Voice vs Atmospheric Music)
+  const handleTogglePlayAudio = (targetMode?: AudioMode) => {
+    if (!spot) return;
+    const modeToPlay = targetMode || audioMode;
+
+    if (isPlayingAudio && (!targetMode || targetMode === audioMode)) {
+      AudioService.stop();
+      setIsPlayingAudio(false);
+      return;
+    }
+
+    setIsPlayingAudio(true);
+    setAudioProgress(0);
+
+    if (modeToPlay === 'voice') {
+      playChapterAudio(currentChapter, isAutoPlayNext);
     } else {
-      setPasskeyError(language === 'lt' ? 'Neteisingas slaptažodis' : 'Invalid plaque passkey');
+      AudioService.playMusic(
+        spot.id,
+        (pct) => setAudioProgress(pct),
+        () => setIsPlayingAudio(false)
+      );
+    }
+  };
+
+  // Play full audio history tour from Chapter 1 to the end hands-free
+  const handlePlayFullAudioTour = () => {
+    if (!spot) return;
+    if (isPlayingAudio && audioMode === 'voice') {
+      AudioService.stop();
+      setIsPlayingAudio(false);
+      return;
+    }
+
+    setAudioMode('voice');
+    setCurrentChapter(0);
+    setIsAutoPlayNext(true);
+    setTimeout(() => {
+      playChapterAudio(0, true);
+    }, 100);
+  };
+
+  // Audio preview for locked state (narrates Chapter 1 history)
+  const handleTogglePreviewAudio = () => {
+    if (!spot?.story?.[0]) return;
+
+    if (isPlayingPreview) {
+      AudioService.stop();
+      setIsPlayingPreview(false);
+      return;
+    }
+
+    setIsPlayingPreview(true);
+    const introText = resolveText(spot.story[0], language);
+    AudioService.playNarrator(
+      introText,
+      language,
+      undefined,
+      () => {
+        setIsPlayingPreview(false);
+      }
+    );
+  };
+
+  const handleSwitchAudioMode = (mode: AudioMode) => {
+    setAudioMode(mode);
+    if (isPlayingAudio) {
+      handleTogglePlayAudio(mode);
     }
   };
 
@@ -253,8 +425,8 @@ export function SpotStoryModal({
 
             <Text style={styles.navSubtext}>
               {language === 'lt'
-                ? `Apskaičiuotas kelionės laikas nuo jūsų vietos (${userCoords.label || 'Vilnius'}):`
-                : `Travel time from your current location (${userCoords.label || 'Vilnius'}):`}
+                ? `Apskaičiuotas kelionės laikas nuo jūsų vietos (${userLabel}):`
+                : `Travel time from your current location (${userLabel}):`}
             </Text>
 
             {/* 4 Transport Modes Grid: Walk, Bicycle, Transit, Car */}
@@ -332,7 +504,7 @@ export function SpotStoryModal({
                       {language === 'lt' ? 'Nuo' : 'From'}:
                     </Text>
                     <Text style={styles.waypointValue} numberOfLines={1}>
-                      {userCoords.label || `${userCoords.latitude.toFixed(3)}° N, ${userCoords.longitude.toFixed(3)}° E`}
+                      {userLabel}
                     </Text>
                   </View>
                   <View style={styles.waypointRow}>
@@ -510,10 +682,10 @@ export function SpotStoryModal({
                 <View style={styles.audioHeaderRow}>
                   <View style={styles.audioBadge}>
                     <Text style={styles.audioBadgeText}>
-                      🎧 {language === 'lt' ? 'GARSO GIDAS' : 'AUDIO EXPERIENCE'}
+                      🎧 {language === 'lt' ? 'GARSO GIDAS' : 'AUDIO TOUR'}
                     </Text>
                   </View>
-                  <Text style={styles.audioDurationText}>{audioGuide.duration}</Text>
+                  <Text style={styles.audioDurationText}>⏱️ {audioGuide.duration}</Text>
                 </View>
 
                 <Text style={styles.audioTrackTitle}>
@@ -526,14 +698,14 @@ export function SpotStoryModal({
                 {/* Voice vs Ambient Music Toggle */}
                 <View style={styles.audioToggleRow}>
                   <Pressable
-                    onPress={() => setAudioMode('voice')}
+                    onPress={() => handleSwitchAudioMode('voice')}
                     style={[styles.audioTogglePill, audioMode === 'voice' && styles.audioTogglePillActive]}>
                     <Text style={[styles.audioToggleText, audioMode === 'voice' && styles.audioToggleTextActive]}>
-                      🗣️ {language === 'lt' ? 'Balsas' : 'Voice'}
+                      🗣️ {language === 'lt' ? 'Balsas (Istorija)' : 'Voice (History)'}
                     </Text>
                   </Pressable>
                   <Pressable
-                    onPress={() => setAudioMode('music')}
+                    onPress={() => handleSwitchAudioMode('music')}
                     style={[styles.audioTogglePill, audioMode === 'music' && styles.audioTogglePillActive]}>
                     <Text style={[styles.audioToggleText, audioMode === 'music' && styles.audioToggleTextActive]}>
                       🎵 {language === 'lt' ? 'Muzika' : 'Atmospheric Music'}
@@ -563,20 +735,84 @@ export function SpotStoryModal({
                   ))}
                 </View>
 
-                {/* Audio Play/Pause Button */}
-                <Pressable
-                  onPress={() => setIsPlayingAudio(!isPlayingAudio)}
-                  style={styles.audioPlayButton}>
-                  <Text style={styles.audioPlayButtonText}>
-                    {isPlayingAudio
-                      ? language === 'lt'
-                        ? '⏸ Sustabdyti įrašą'
-                        : '⏸ Pause Narration'
-                      : language === 'lt'
-                      ? '▶ Klausytis pasakojimo'
-                      : '▶ Play Audio Guide'}
-                  </Text>
-                </Pressable>
+                {/* Primary Action: Listen to Full Audio History Hands-Free */}
+                {audioMode === 'voice' && (
+                  <Pressable
+                    onPress={handlePlayFullAudioTour}
+                    style={({ pressed }) => [
+                      styles.audioFullTourBtn,
+                      pressed && styles.audioFullTourBtnPressed,
+                    ]}>
+                    <Text style={styles.audioFullTourBtnIcon}>
+                      {isPlayingAudio && audioMode === 'voice' ? '⏸' : '🎧'}
+                    </Text>
+                    <Text style={styles.audioFullTourBtnText}>
+                      {isPlayingAudio && audioMode === 'voice'
+                        ? language === 'lt'
+                          ? 'Pristabdyti pasakojimą'
+                          : 'Pause Narration'
+                        : language === 'lt'
+                        ? '▶ Klausytis visos istorijos (Laisvų rankų režimas)'
+                        : '▶ Listen to Full History (Hands-Free Tour)'}
+                    </Text>
+                  </Pressable>
+                )}
+
+                {/* Secondary Play Button (Current Chapter / Music) */}
+                <View style={styles.audioSecondaryRow}>
+                  <Pressable
+                    onPress={() => handleTogglePlayAudio()}
+                    style={styles.audioChapterPlayBtn}>
+                    <Text style={styles.audioChapterPlayBtnText}>
+                      {isPlayingAudio
+                        ? language === 'lt'
+                          ? audioMode === 'music'
+                            ? '⏸ Sustabdyti muziką'
+                            : `⏸ Sustabdyti ${currentChapter + 1} dalį`
+                          : audioMode === 'music'
+                          ? '⏸ Pause Music'
+                          : `⏸ Pause Chapter ${currentChapter + 1}`
+                        : language === 'lt'
+                        ? audioMode === 'music'
+                          ? '▶ Groti atmosferinę muziką'
+                          : `▶ Klausytis tik ${currentChapter + 1} dalies`
+                        : audioMode === 'music'
+                        ? '▶ Play Atmospheric Music'
+                        : `▶ Play Chapter ${currentChapter + 1} Only`}
+                    </Text>
+                  </Pressable>
+                </View>
+
+                {/* Autoplay Next Chapter Toggle */}
+                {audioMode === 'voice' && (
+                  <View style={styles.autoplayToggleRow}>
+                    <Text style={styles.autoplayToggleLabel}>
+                      {language === 'lt'
+                        ? '🔄 Automatinis kitos dalies paleidimas'
+                        : '🔄 Auto-advance to next chapter'}
+                    </Text>
+                    <Pressable
+                      onPress={() => setIsAutoPlayNext((prev) => !prev)}
+                      style={[
+                        styles.autoplayPill,
+                        isAutoPlayNext && styles.autoplayPillActive,
+                      ]}>
+                      <Text
+                        style={[
+                          styles.autoplayPillText,
+                          isAutoPlayNext && styles.autoplayPillTextActive,
+                        ]}>
+                        {isAutoPlayNext
+                          ? language === 'lt'
+                            ? 'Įjungta (Laisvos rankos)'
+                            : 'ON (Hands-Free)'
+                          : language === 'lt'
+                          ? 'Išjungta'
+                          : 'OFF'}
+                      </Text>
+                    </Pressable>
+                  </View>
+                )}
               </View>
 
               {/* Deep Lore Story Chapters */}
@@ -589,6 +825,13 @@ export function SpotStoryModal({
                         : `Chapter ${currentChapter + 1} of ${story.length}`}
                     </Text>
                   </View>
+                  {isPlayingAudio && audioMode === 'voice' && (
+                    <View style={styles.speakingIndicator}>
+                      <Text style={styles.speakingIndicatorText}>
+                        🎙️ {language === 'lt' ? 'Skaitoma dabar...' : 'Speaking now...'}
+                      </Text>
+                    </View>
+                  )}
                 </View>
 
                 <Text style={styles.chapterText}>
@@ -600,7 +843,14 @@ export function SpotStoryModal({
                   <View style={styles.paginationRow}>
                     <Pressable
                       disabled={currentChapter === 0}
-                      onPress={() => setCurrentChapter((prev) => Math.max(0, prev - 1))}
+                      onPress={() => {
+                        const prevIdx = Math.max(0, currentChapter - 1);
+                        setCurrentChapter(prevIdx);
+                        if (isPlayingAudio && audioMode === 'voice') {
+                          AudioService.stop();
+                          playChapterAudio(prevIdx, isAutoPlayNext);
+                        }
+                      }}
                       style={[styles.pagePill, currentChapter === 0 && styles.pagePillDisabled]}>
                       <Text style={[styles.pagePillText, currentChapter === 0 && styles.pagePillTextDisabled]}>
                         ← {language === 'lt' ? 'Atgal' : 'Previous'}
@@ -609,8 +859,16 @@ export function SpotStoryModal({
 
                     <View style={styles.dotsRow}>
                       {story.map((_, i) => (
-                        <View
+                        <Pressable
                           key={i}
+                          onPress={() => {
+                            setCurrentChapter(i);
+                            if (isPlayingAudio && audioMode === 'voice') {
+                              AudioService.stop();
+                              playChapterAudio(i, isAutoPlayNext);
+                            }
+                          }}
+                          hitSlop={6}
                           style={[
                             styles.dot,
                             i === currentChapter ? { backgroundColor: WiseColors.primary } : styles.dotInactive,
@@ -621,7 +879,14 @@ export function SpotStoryModal({
 
                     <Pressable
                       disabled={currentChapter === story.length - 1}
-                      onPress={() => setCurrentChapter((prev) => Math.min(story.length - 1, prev + 1))}
+                      onPress={() => {
+                        const nextIdx = Math.min(story.length - 1, currentChapter + 1);
+                        setCurrentChapter(nextIdx);
+                        if (isPlayingAudio && audioMode === 'voice') {
+                          AudioService.stop();
+                          playChapterAudio(nextIdx, isAutoPlayNext);
+                        }
+                      }}
                       style={[styles.pagePill, currentChapter === story.length - 1 && styles.pagePillDisabled]}>
                       <Text
                         style={[
@@ -669,6 +934,48 @@ export function SpotStoryModal({
                   : 'The deep historical lore, archival voice guide, authentic music, and secret facts are locked. When you arrive at this spot in Lithuania, tap your phone to the NFC plaque to unlock 30-day access.'}
               </Text>
 
+              {/* Historical Audio Preview Card */}
+              <View style={styles.previewAudioCard}>
+                <View style={styles.previewBadgeRow}>
+                  <View style={styles.previewTag}>
+                    <Text style={styles.previewTagText}>
+                      🎧 {language === 'lt' ? 'ISTORINIO PASAKOJIMO ĮŽANGA' : 'AUDIO HISTORY PREVIEW'}
+                    </Text>
+                  </View>
+                  <Text style={styles.previewDurationText}>
+                    ⏱️ {spot.audioGuide.duration}
+                  </Text>
+                </View>
+
+                <Text style={styles.previewTitleText}>
+                  {resolveText(spot.audioGuide.title, language)}
+                </Text>
+                <Text style={styles.previewNarratorText}>
+                  🎙️ {resolveText(spot.audioGuide.narrator, language)}
+                </Text>
+
+                <Text style={styles.previewExcerptText} numberOfLines={3}>
+                  {resolveText(spot.story[0], language)}
+                </Text>
+
+                <Pressable
+                  onPress={handleTogglePreviewAudio}
+                  style={({ pressed }) => [
+                    styles.previewPlayBtn,
+                    pressed && styles.previewPlayBtnPressed,
+                  ]}>
+                  <Text style={styles.previewPlayBtnText}>
+                    {isPlayingPreview
+                      ? language === 'lt'
+                        ? '⏸ Sustabdyti įžangą'
+                        : '⏸ Pause Audio Preview'
+                      : language === 'lt'
+                      ? '▶ Klausytis 1 dalies įžangos (Be skaitymo)'
+                      : '▶ Listen to Chapter 1 History (Hands-Free)'}
+                  </Text>
+                </Pressable>
+              </View>
+
               {/* Scan NFC Button */}
               <Pressable
                 disabled={isScanningNFC}
@@ -688,86 +995,17 @@ export function SpotStoryModal({
                 </Text>
               </Pressable>
 
-              {/* Physical NFC Tag Writing & Passkey Card */}
-              <View style={styles.nfcSetupBox}>
-                <View style={styles.nfcSetupHeader}>
-                  <Text style={styles.nfcSetupTitle}>
-                    🔑 {language === 'lt' ? 'Fizinės NFC žymos slaptažodis' : 'Plaque Password & Tag Setup'}
-                  </Text>
-                  <View style={styles.nfcKeyBadge}>
-                    <Text style={styles.nfcKeyBadgeText}>{spot.nfcSecretKey}</Text>
-                  </View>
-                </View>
-
-                <Text style={styles.nfcSetupSubtitle}>
-                  {language === 'lt'
-                    ? 'Įveskite fizinės lentelės slaptažodį arba įrašykite žemiau esantį URL į savo NFC žymą:'
-                    : 'Enter the plaque password or write this URL to your physical NFC tag:'}
+              {/* Enter Plaque Passkey Button */}
+              <Pressable
+                onPress={handleEnterPasskey}
+                style={({ pressed }) => [
+                  styles.passkeyButton,
+                  pressed && styles.passkeyButtonPressed,
+                ]}>
+                <Text style={styles.passkeyButtonText}>
+                  🔑 {language === 'lt' ? 'Įvesti lentelės kodą' : 'Enter Plaque Passkey'}
                 </Text>
-
-                {/* Password / Passkey manual input */}
-                <View style={styles.passkeyInputRow}>
-                  <TextInput
-                    style={[styles.passkeyInput, passkeyError ? styles.passkeyInputError : null]}
-                    placeholder={language === 'lt' ? 'Įveskite slaptažodį...' : 'Enter plaque password...'}
-                    placeholderTextColor={WiseColors.mute}
-                    value={enteredPasskey}
-                    onChangeText={(t) => {
-                      setEnteredPasskey(t);
-                      if (passkeyError) setPasskeyError(null);
-                    }}
-                    autoCapitalize="characters"
-                  />
-                  <Pressable onPress={handleValidatePasskey} style={styles.validatePasskeyBtn}>
-                    <Text style={styles.validatePasskeyBtnText}>
-                      {language === 'lt' ? 'Patvirtinti' : 'Unlock'}
-                    </Text>
-                  </Pressable>
-                </View>
-                {passkeyError && <Text style={styles.passkeyErrorText}>{passkeyError}</Text>}
-
-                {/* Tag URL Box */}
-                <View style={styles.tagUrlContainer}>
-                  <Text style={styles.tagUrlLabel}>
-                    {language === 'lt' ? 'URL įrašymui į NFC:' : 'URL to write on NFC tag:'}
-                  </Text>
-                  <Text style={styles.tagUrlValue} selectable>
-                    {getNfcPayload(spot)}
-                  </Text>
-                </View>
-
-                {/* How to Write Tag Instructions Toggle */}
-                <Pressable
-                  onPress={() => setShowNfcGuide((v) => !v)}
-                  style={styles.nfcGuideToggleBtn}>
-                  <Text style={styles.nfcGuideToggleText}>
-                    {showNfcGuide ? '▲ ' : '▼ '}
-                    {language === 'lt'
-                      ? 'Kaip įrašyti šį URL į NFC žymą per iPhone?'
-                      : 'How to write this URL onto your NFC tag?'}
-                  </Text>
-                </Pressable>
-
-                {showNfcGuide && (
-                  <View style={styles.nfcGuideStepsBox}>
-                    <Text style={styles.nfcGuideStep}>
-                      1. Install the free <Text style={styles.boldText}>"NFC Tools"</Text> app from App Store.
-                    </Text>
-                    <Text style={styles.nfcGuideStep}>
-                      2. Open it, tap <Text style={styles.boldText}>Write</Text> → <Text style={styles.boldText}>Add a record</Text> → <Text style={styles.boldText}>Custom URL / URI</Text>.
-                    </Text>
-                    <Text style={styles.nfcGuideStep}>
-                      3. Paste: <Text style={styles.codeText}>{getNfcPayload(spot)}</Text>
-                    </Text>
-                    <Text style={styles.nfcGuideStep}>
-                      4. Tap <Text style={styles.boldText}>Write</Text> and touch your physical NFC tag to the top back of your iPhone.
-                    </Text>
-                    <Text style={styles.nfcGuideStep}>
-                      5. Done! Whenever anyone taps this tag, iOS will pop up a banner and instantly unlock the 30-day story!
-                    </Text>
-                  </View>
-                )}
-              </View>
+              </Pressable>
 
               <Text style={styles.lockedDisclaimer}>
                 {language === 'lt'
@@ -1618,136 +1856,25 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: -0.2,
   },
-  nfcSetupBox: {
+  passkeyButton: {
     width: '100%',
-    backgroundColor: WiseColors.canvasSoft,
-    borderRadius: Rounded.xl,
-    padding: Spacing.md,
+    backgroundColor: WiseColors.canvas,
     borderWidth: 1.5,
-    borderColor: '#d0d7d2',
-    gap: 10,
+    borderColor: WiseColors.primary,
+    borderRadius: Rounded.pill,
+    paddingVertical: 12,
+    alignItems: 'center',
     marginTop: 8,
   },
-  nfcSetupHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 8,
-  },
-  nfcSetupTitle: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: WiseColors.ink,
-    flex: 1,
-  },
-  nfcKeyBadge: {
+  passkeyButtonPressed: {
     backgroundColor: WiseColors.primaryPale,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: Rounded.pill,
-    borderWidth: 1,
-    borderColor: WiseColors.primaryNeutral,
+    transform: [{ scale: 0.99 }],
   },
-  nfcKeyBadgeText: {
-    fontSize: 11,
-    fontWeight: '900',
+  passkeyButtonText: {
     color: WiseColors.primary,
-    letterSpacing: 0.5,
-  },
-  nfcSetupSubtitle: {
-    fontSize: 12,
-    color: WiseColors.body,
-    lineHeight: 16,
-  },
-  passkeyInputRow: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'center',
-  },
-  passkeyInput: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#cbd5e1',
-    borderRadius: Rounded.pill,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    fontSize: 13,
-    fontWeight: '700',
-    color: WiseColors.ink,
-  },
-  passkeyInputError: {
-    borderColor: '#ef4444',
-  },
-  validatePasskeyBtn: {
-    backgroundColor: WiseColors.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: Rounded.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  validatePasskeyBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '900',
-    fontSize: 12,
-  },
-  passkeyErrorText: {
-    fontSize: 11,
-    color: '#ef4444',
-    fontWeight: '700',
-    marginTop: -4,
-  },
-  tagUrlContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: Rounded.md,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    gap: 3,
-  },
-  tagUrlLabel: {
-    fontSize: 10,
+    fontSize: 14,
     fontWeight: '800',
-    color: WiseColors.mute,
-    textTransform: 'uppercase',
-  },
-  tagUrlValue: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: WiseColors.primary,
-    fontFamily: Platform.select({ ios: 'Menlo', default: 'monospace' }),
-  },
-  nfcGuideToggleBtn: {
-    paddingVertical: 4,
-    alignItems: 'center',
-  },
-  nfcGuideToggleText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: WiseColors.primary,
-  },
-  nfcGuideStepsBox: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: Rounded.md,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    gap: 6,
-  },
-  nfcGuideStep: {
-    fontSize: 12,
-    color: WiseColors.body,
-    lineHeight: 17,
-  },
-  boldText: {
-    fontWeight: '800',
-    color: WiseColors.ink,
-  },
-  codeText: {
-    fontWeight: '800',
-    color: WiseColors.primary,
-    fontFamily: Platform.select({ ios: 'Menlo', default: 'monospace' }),
+    letterSpacing: -0.2,
   },
   lockedDisclaimer: {
     fontSize: 12,
@@ -1755,5 +1882,171 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 18,
     marginTop: 4,
+  },
+  audioFullTourBtn: {
+    backgroundColor: WiseColors.primary,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: Rounded.pill,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 10,
+    shadowColor: WiseColors.primary,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  audioFullTourBtnPressed: {
+    backgroundColor: WiseColors.primaryActive,
+    transform: [{ scale: 0.99 }],
+  },
+  audioFullTourBtnIcon: {
+    fontSize: 18,
+    color: '#FFFFFF',
+  },
+  audioFullTourBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+    fontSize: 14,
+    letterSpacing: -0.2,
+  },
+  audioSecondaryRow: {
+    marginTop: 8,
+  },
+  audioChapterPlayBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: Rounded.pill,
+    backgroundColor: WiseColors.canvasSoft,
+    borderWidth: 1,
+    borderColor: '#dcdfd9',
+    alignItems: 'center',
+  },
+  audioChapterPlayBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: WiseColors.ink,
+  },
+  autoplayToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#e8ece9',
+    marginTop: 8,
+  },
+  autoplayToggleLabel: {
+    fontSize: 12,
+    color: WiseColors.mute,
+    fontWeight: '600',
+  },
+  autoplayPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: Rounded.pill,
+    backgroundColor: WiseColors.canvasSoft,
+    borderWidth: 1,
+    borderColor: '#dcdfd9',
+  },
+  autoplayPillActive: {
+    backgroundColor: WiseColors.primaryPale,
+    borderColor: WiseColors.primaryNeutral,
+  },
+  autoplayPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: WiseColors.mute,
+  },
+  autoplayPillTextActive: {
+    color: WiseColors.primary,
+  },
+  speakingIndicator: {
+    backgroundColor: WiseColors.primaryPale,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: Rounded.pill,
+  },
+  speakingIndicatorText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: WiseColors.primary,
+  },
+  previewAudioCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: Rounded.xl,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: '#dcdfd9',
+    gap: 8,
+    width: '100%',
+    marginVertical: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  previewBadgeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  previewTag: {
+    backgroundColor: WiseColors.primaryPale,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: Rounded.pill,
+    borderWidth: 1,
+    borderColor: WiseColors.primaryNeutral,
+  },
+  previewTagText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: WiseColors.primary,
+    letterSpacing: 0.5,
+  },
+  previewDurationText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: WiseColors.mute,
+  },
+  previewTitleText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: WiseColors.ink,
+    letterSpacing: -0.2,
+  },
+  previewNarratorText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: WiseColors.mute,
+  },
+  previewExcerptText: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: WiseColors.body,
+    fontStyle: 'italic',
+  },
+  previewPlayBtn: {
+    backgroundColor: WiseColors.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: Rounded.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+  previewPlayBtnPressed: {
+    backgroundColor: WiseColors.primaryActive,
+    transform: [{ scale: 0.99 }],
+  },
+  previewPlayBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 13,
   },
 });

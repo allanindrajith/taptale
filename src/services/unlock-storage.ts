@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SafeStorage } from './safe-storage';
 
 export interface UnlockRecord {
   spotId: string;
@@ -8,27 +8,14 @@ export interface UnlockRecord {
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
-// Rich Demo Passes visible ONLY in the Demo Account (demo@taptale.com)
+export const CATHEDRAL_SQUARE_ID = 'vln-cathedral-square';
+
+// Only Cathedral Square is unlocked; all other places are locked
 export const DEMO_RECORDS: Record<string, UnlockRecord> = {
-  'vln-gediminas-tower': {
-    spotId: 'vln-gediminas-tower',
-    unlockedAt: Date.now() - 3 * 24 * 60 * 60 * 1000,
-    expiresAt: Date.now() + 27 * 24 * 60 * 60 * 1000,
-  },
-  'vln-cathedral-square': {
-    spotId: 'vln-cathedral-square',
-    unlockedAt: Date.now() - 5 * 24 * 60 * 60 * 1000,
-    expiresAt: Date.now() + 25 * 24 * 60 * 60 * 1000,
-  },
-  'vln-uzupis': {
-    spotId: 'vln-uzupis',
-    unlockedAt: Date.now() - 1 * 24 * 60 * 60 * 1000,
-    expiresAt: Date.now() + 29 * 24 * 60 * 60 * 1000,
-  },
-  'trk-island-castle': {
-    spotId: 'trk-island-castle',
-    unlockedAt: Date.now() - 7 * 24 * 60 * 60 * 1000,
-    expiresAt: Date.now() + 23 * 24 * 60 * 60 * 1000,
+  [CATHEDRAL_SQUARE_ID]: {
+    spotId: CATHEDRAL_SQUARE_ID,
+    unlockedAt: Date.now() - 2 * 24 * 60 * 60 * 1000,
+    expiresAt: Date.now() + 28 * 24 * 60 * 60 * 1000,
   },
 };
 
@@ -59,11 +46,28 @@ async function persistCurrentStore() {
   }
 
   try {
-    await AsyncStorage.setItem(key, data);
+    await SafeStorage.setItem(key, data);
   } catch (e) {}
 
   notify();
 }
+
+// Load saved passes from local storage on app start
+SafeStorage.getItem(getStorageKey(activeUserEmail))
+  .then((stored) => {
+    if (stored !== null && stored !== undefined) {
+      try {
+        memoryStore = JSON.parse(stored) || {};
+        notify();
+      } catch (e) {
+        memoryStore = {};
+      }
+    } else {
+      memoryStore = { ...DEMO_RECORDS };
+      persistCurrentStore();
+    }
+  })
+  .catch(() => {});
 
 export const UnlockService = {
   /**
@@ -79,47 +83,50 @@ export const UnlockService = {
 
   /**
    * Set the active user email and load their specific passes.
-   * If Demo: loads rich demo passes.
-   * If Real/Other User: loads their saved passes (or starts completely fresh with 0 passes).
    */
   async switchUser(email: string, isDemo = false) {
     activeUserEmail = email.trim().toLowerCase();
 
-    if (isDemo || activeUserEmail === 'demo@taptale.com') {
-      memoryStore = { ...DEMO_RECORDS };
-      persistCurrentStore();
-      return;
-    }
-
-    // Real user account: load their personal stored passes (defaults to empty {})
     const key = getStorageKey(activeUserEmail);
     let loaded: Record<string, UnlockRecord> | null = null;
 
     try {
-      const stored = await AsyncStorage.getItem(key);
-      if (stored) {
+      const stored = await SafeStorage.getItem(key);
+      if (stored !== null && stored !== undefined) {
         loaded = JSON.parse(stored);
       }
     } catch (e) {}
 
-    if (!loaded && typeof window !== 'undefined' && window.localStorage) {
-      try {
-        const stored = window.localStorage.getItem(key);
-        if (stored) loaded = JSON.parse(stored);
-      } catch (e) {}
+    if (loaded !== null) {
+      memoryStore = loaded;
+    } else {
+      memoryStore = isDemo || activeUserEmail === 'demo@taptale.com' ? { ...DEMO_RECORDS } : {};
+      persistCurrentStore();
     }
-
-    // For a fresh account with no prior unlocks, start with empty {}
-    memoryStore = loaded ? loaded : {};
     notify();
   },
 
   /**
-   * Reset/clear all passes for the current user (gives a 100% fresh start)
+   * Reset passes: Keeps ONLY Cathedral Square unlocked, and locks all other 6 places.
+   * Gives a clean testing state for physical NFC plaques while keeping one sample pass active.
+   */
+  async resetEverything() {
+    memoryStore = {
+      [CATHEDRAL_SQUARE_ID]: {
+        spotId: CATHEDRAL_SQUARE_ID,
+        unlockedAt: Date.now() - 2 * 24 * 60 * 60 * 1000,
+        expiresAt: Date.now() + 28 * 24 * 60 * 60 * 1000,
+      },
+    };
+    await persistCurrentStore();
+    notify();
+  },
+
+  /**
+   * Reset/clear passes for the current user
    */
   async clearForFreshStart() {
-    memoryStore = {};
-    await persistCurrentStore();
+    await this.resetEverything();
   },
 
   /**

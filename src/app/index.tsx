@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ExpoLinking from 'expo-linking';
+import { useLocalSearchParams } from 'expo-router';
 
 import { LocationAnimation } from '@/components/location-animation';
 import { SpotStoryModal } from '@/components/spot-story-modal';
@@ -25,23 +26,16 @@ import {
   formatDistance,
   getTravelEstimates,
   formatMinutes,
-  getNfcPayload,
 } from '@/constants/spots';
 import { Rounded, Spacing, WiseColors } from '@/constants/theme';
 import { LocationService, LocationState } from '@/services/location-service';
 import { UnlockService } from '@/services/unlock-storage';
 import { NfcService } from '@/services/nfc-service';
+import { useLanguage } from '@/hooks/use-language';
 
-// Preset locations to test GPS proximity
-const SIMULATED_LOCATIONS = [
-  { label: 'Vilnius Old Town', lat: 54.6853, lng: 25.2872 },
-  { label: 'Gediminas Hill', lat: 54.6869, lng: 25.2911 },
-  { label: 'Užupis Bridge', lat: 54.6802, lng: 25.2948 },
-  { label: 'Trakai Lake', lat: 54.6524, lng: 24.9339 },
-];
 
 export default function HomeScreen() {
-  const [language, setLanguage] = useState<AppLanguage>('en');
+  const { language, setLanguage } = useLanguage();
   const [selectedCity, setSelectedCity] = useState<string>('all');
   const [activeSpot, setActiveSpot] = useState<Spot | null>(null);
   const [isScanning, setIsScanning] = useState(false);
@@ -60,6 +54,18 @@ export default function HomeScreen() {
     return unsub;
   }, []);
 
+  const searchParams = useLocalSearchParams<{ spot?: string }>();
+
+  // If navigated with ?spot=... (e.g. from unlock screen), immediately open that spot
+  useEffect(() => {
+    if (searchParams.spot) {
+      const found = SPOTS.find((s) => s.id === searchParams.spot);
+      if (found) {
+        setActiveSpot(found);
+      }
+    }
+  }, [searchParams.spot]);
+
   // Listen for physical NFC tag deep links (e.g. taptale://unlock?spot=vln-cathedral-square&key=STEBUKLAS-1989)
   useEffect(() => {
     const handleUrl = (event: { url: string }) => {
@@ -72,14 +78,24 @@ export default function HomeScreen() {
         if (spotId && key) {
           const targetSpot = SPOTS.find((s) => s.id === spotId);
           if (targetSpot) {
+            const alreadyUnlocked = UnlockService.isUnlocked(spotId);
             const res = UnlockService.validateAndUnlock(spotId, key, targetSpot.nfcSecretKey);
             if (res.success) {
               setUnlockVersion((v) => v + 1);
+              // Immediately visit that spot's page
               setActiveSpot(targetSpot);
               Alert.alert(
-                '🏷️ NFC Plaque Verified!',
-                `Password verified for ${resolveText(targetSpot.title, language)}.\n\n30-Day Pass activated! Full audio guide & secrets unlocked.`,
-                [{ text: 'Explore Now' }]
+                alreadyUnlocked
+                  ? (language === 'lt' ? '🏷️ Sveiki sugrįžę!' : '🏷️ Welcome Back!')
+                  : (language === 'lt' ? '🏷️ Fizinė NFC Žyma Patvirtinta!' : '🏷️ NFC Plaque Verified!'),
+                alreadyUnlocked
+                  ? (language === 'lt'
+                      ? `„${resolveText(targetSpot.title, language)}“ jau atrakinta! 30 d. prieiga atnaujinta. Atveriame istoriją…`
+                      : `"${resolveText(targetSpot.title, language)}" is already unlocked! 30-Day pass renewed. Opening story…`)
+                  : (language === 'lt'
+                      ? `Sėkmingai atrakinote „${resolveText(targetSpot.title, language)}“ 30 dienų! Atveriame istoriją…`
+                      : `30-Day Pass activated for "${resolveText(targetSpot.title, language)}"! Opening full audio guide & secrets…`),
+                [{ text: language === 'lt' ? 'Tyrinėti' : 'Explore Now' }]
               );
             } else {
               Alert.alert('❌ NFC Tag Error', res.message);
@@ -129,9 +145,16 @@ export default function HomeScreen() {
     ? calculateDistanceKm(locationState.latitude, locationState.longitude, nearestSpot.latitude, nearestSpot.longitude)
     : 0;
 
+  // User-facing clean location text
+  const userLocationTitle = locationState.district && !locationState.cityName?.includes(locationState.district)
+    ? `${locationState.district}, ${locationState.cityName}`
+    : (locationState.cityName || locationState.label || (language === 'lt' ? 'Vilnius, Lietuva' : 'Vilnius, Lithuania'));
+
   // Real physical NFC scanning: Reads tag from physical NFC chip and validates cryptographic key
+  // Unlocks that specific place and immediately visits its page (or visits if already unlocked)
   const handleTriggerScan = async (spot?: Spot) => {
-    const target = spot || nearestSpot || SPOTS[0];
+    // When called without a spot (from Home button), target is undefined so it accepts ANY TapTale plaque
+    const target = spot;
     setIsScanning(true);
     setScanMessage(
       language === 'lt'
@@ -146,19 +169,70 @@ export default function HomeScreen() {
 
       if (scanResult.success && scanResult.spot) {
         handleUnlockedChange();
+        // Immediately visit that specific place's story & audio page!
         setActiveSpot(scanResult.spot);
-        Alert.alert(
-          language === 'lt' ? '🎉 Fizinė NFC Žyma Patvirtinta!' : '🎉 Physical NFC Tag Verified!',
-          scanResult.message,
-          [{ text: language === 'lt' ? 'Tyrinėti' : 'Explore Now' }]
-        );
+
+        if (scanResult.alreadyUnlocked) {
+          Alert.alert(
+            language === 'lt' ? '🎉 Sveiki sugrįžę!' : '🎉 Welcome Back!',
+            language === 'lt'
+              ? `„${resolveText(scanResult.spot.title, language)}“ jau atrakinta! 30 d. prieiga atnaujinta. Atveriame istoriją ir garsą.`
+              : `"${resolveText(scanResult.spot.title, language)}" is already unlocked! 30-day pass renewed. Opening story and audio guide now.`,
+            [{ text: language === 'lt' ? 'Atverti' : 'Open' }]
+          );
+        } else {
+          Alert.alert(
+            language === 'lt' ? '🎉 Fizinė NFC Žyma Patvirtinta!' : '🎉 Physical NFC Tag Verified!',
+            language === 'lt'
+              ? `Sėkmingai atrakinote „${resolveText(scanResult.spot.title, language)}“ 30 dienų! Atveriame istoriją…`
+              : `Successfully unlocked "${resolveText(scanResult.spot.title, language)}" for 30 days! Opening story & audio…`,
+            [{ text: language === 'lt' ? 'Tyrinėti' : 'Explore Now' }]
+          );
+        }
       } else {
-        // Physical tag invalid, missing, or hardware absent - DO NOT unlock
-        Alert.alert(
-          language === 'lt' ? 'Fizinio NFC Skaitytuvas' : 'Physical NFC Reader',
-          scanResult.message,
-          [{ text: language === 'lt' ? 'Supratau' : 'OK' }]
-        );
+        // Check if NFC hardware is missing in this test environment (e.g. simulator/dev client)
+        const isSupported = await NfcService.isHardwareSupported();
+        if (!isSupported) {
+          // Provide instant simulation menu so user can test the exact unlock + visit flow
+          const defaultSpot = nearestSpot || SPOTS[0];
+          Alert.alert(
+            language === 'lt' ? 'NFC Prieigos Testavimas' : 'NFC Heritage Plaque',
+            language === 'lt'
+              ? `Fizinis CoreNFC skaitytuvas neaptiktas simuliatoriuje. Ar norite simuliuoti fizinį NFC prilietimą prie artimiausios lentelės (${resolveText(defaultSpot.title, language)})?`
+              : `CoreNFC hardware not present in simulator. Would you like to simulate tapping the nearest physical plaque (${resolveText(defaultSpot.title, language)})?`,
+            [
+              { text: language === 'lt' ? 'Atšaukti' : 'Cancel', style: 'cancel' },
+              {
+                text: language === 'lt' ? 'Priliesti lentelę' : 'Tap Plaque Now',
+                onPress: () => {
+                  const wasUnlocked = UnlockService.isUnlocked(defaultSpot.id);
+                  UnlockService.unlockSpot(defaultSpot.id);
+                  handleUnlockedChange();
+                  // Immediately visit that place's page!
+                  setActiveSpot(defaultSpot);
+                  Alert.alert(
+                    wasUnlocked
+                      ? (language === 'lt' ? '🎉 Sveiki sugrįžę!' : '🎉 Welcome Back!')
+                      : (language === 'lt' ? '🎉 Vieta Atrakinta!' : '🎉 Plaque Verified!'),
+                    wasUnlocked
+                      ? (language === 'lt'
+                          ? `„${resolveText(defaultSpot.title, language)}“ jau atrakinta! Atveriame puslapį.`
+                          : `"${resolveText(defaultSpot.title, language)}" is already unlocked! Visiting page now.`)
+                      : (language === 'lt'
+                          ? `Sėkmingai atrakinote „${resolveText(defaultSpot.title, language)}“ 30 dienų! Atveriame puslapį.`
+                          : `Successfully unlocked "${resolveText(defaultSpot.title, language)}" for 30 days! Visiting page now.`)
+                  );
+                },
+              },
+            ]
+          );
+        } else {
+          Alert.alert(
+            language === 'lt' ? 'Fizinio NFC Skaitytuvas' : 'Physical NFC Reader',
+            scanResult.message,
+            [{ text: language === 'lt' ? 'Supratau' : 'OK' }]
+          );
+        }
       }
     } catch (err: any) {
       setIsScanning(false);
@@ -230,21 +304,15 @@ export default function HomeScreen() {
         {/* GEOGRAPHICAL PROGRESS & RADAR CARD */}
         <View style={styles.progressCard}>
           <View style={styles.progressHeaderRow}>
-            <View style={[styles.gpsPulseDot, locationState.isRealGps && styles.gpsPulseDotLive]} />
+            <View style={[styles.gpsPulseDot, styles.gpsPulseDotLive]} />
             <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={styles.progressLocationText}>
-                  {locationState.isRealGps ? '🛰️ Live Physical GPS' : `📍 ${locationState.label}`}
-                </Text>
-                {locationState.isRealGps && (
-                  <View style={styles.liveGpsBadge}>
-                    <Text style={styles.liveGpsBadgeText}>REAL TIME</Text>
-                  </View>
-                )}
-              </View>
+              <Text style={styles.progressLocationText}>
+                📍 {userLocationTitle}
+              </Text>
               <Text style={styles.progressSubLocationText}>
-                {locationState.latitude.toFixed(4)}° N, {locationState.longitude.toFixed(4)}° E
-                {locationState.accuracy ? ` • Acc: ±${Math.round(locationState.accuracy)}m` : ''}
+                {nearestSpot
+                  ? `${language === 'lt' ? 'Artimiausias objektas' : 'Nearest landmark'}: ${resolveText(nearestSpot.title, language)} (${formatDistance(nearestDistance, language)})`
+                  : (language === 'lt' ? 'Ieškoma lankytinų vietų…' : 'Finding nearby landmarks…')}
               </Text>
             </View>
           </View>
@@ -270,57 +338,12 @@ export default function HomeScreen() {
 
             <View style={styles.statItem}>
               <Text style={styles.statNumber}>
-                {formatDistance(nearestDistance, language).split(' ')[0]}
+                {formatDistance(nearestDistance, language)}
               </Text>
               <Text style={styles.statLabel}>
                 {language === 'lt' ? 'Artimiausias' : 'Nearest Spot'}
               </Text>
             </View>
-          </View>
-
-          {/* Quick Simulated vs Real GPS Location Switcher */}
-          <View style={styles.simLocRow}>
-            <Text style={styles.simLocTitle}>
-              {language === 'lt' ? 'GPS Režimas:' : 'GPS Mode:'}
-            </Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.simLocScroll}>
-              {/* Real-time GPS Chip */}
-              <Pressable
-                onPress={() => LocationService.enableRealGps()}
-                style={[
-                  styles.simLocChip,
-                  locationState.isRealGps && styles.liveGpsChipActive,
-                ]}>
-                <Text
-                  style={[
-                    styles.simLocChipText,
-                    locationState.isRealGps && styles.liveGpsChipTextActive,
-                  ]}>
-                  🛰️ Real-Time GPS
-                </Text>
-              </Pressable>
-
-              {SIMULATED_LOCATIONS.map((loc) => {
-                const isSelected = !locationState.isRealGps && locationState.label === loc.label;
-                return (
-                  <Pressable
-                    key={loc.label}
-                    onPress={() => LocationService.setSimulatedLocation(loc.lat, loc.lng, loc.label)}
-                    style={[
-                      styles.simLocChip,
-                      isSelected && styles.simLocChipActive,
-                    ]}>
-                    <Text
-                      style={[
-                        styles.simLocChipText,
-                        isSelected && styles.simLocChipTextActive,
-                      ]}>
-                      {loc.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
           </View>
         </View>
 
@@ -691,28 +714,16 @@ const styles = StyleSheet.create({
   gpsPulseDotLive: {
     backgroundColor: '#10b981',
   },
-  liveGpsBadge: {
-    backgroundColor: '#10b981',
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 4,
-  },
-  liveGpsBadgeText: {
-    color: '#ffffff',
-    fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-  },
   progressLocationText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: WiseColors.body,
+    fontSize: 14,
+    fontWeight: '800',
+    color: WiseColors.ink,
   },
   progressSubLocationText: {
-    fontSize: 11,
-    color: WiseColors.mute,
+    fontSize: 12,
+    color: WiseColors.body,
     fontWeight: '500',
-    marginTop: 2,
+    marginTop: 3,
   },
   statGrid: {
     flexDirection: 'row',
@@ -727,7 +738,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   statNumber: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '900',
     color: WiseColors.ink,
   },
@@ -741,49 +752,6 @@ const styles = StyleSheet.create({
     width: 1,
     height: 28,
     backgroundColor: '#dcdfd9',
-  },
-  simLocRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  simLocTitle: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: WiseColors.mute,
-    textTransform: 'uppercase',
-  },
-  simLocScroll: {
-    gap: 6,
-  },
-  simLocChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: Rounded.pill,
-    backgroundColor: WiseColors.canvasSoft,
-    borderWidth: 1,
-    borderColor: '#dcdfd9',
-  },
-  simLocChipActive: {
-    backgroundColor: WiseColors.primaryPale,
-    borderColor: WiseColors.primary,
-  },
-  liveGpsChipActive: {
-    backgroundColor: '#dcfce7',
-    borderColor: '#10b981',
-  },
-  simLocChipText: {
-    fontSize: 11,
-    color: WiseColors.body,
-    fontWeight: '600',
-  },
-  simLocChipTextActive: {
-    color: WiseColors.primary,
-    fontWeight: '800',
-  },
-  liveGpsChipTextActive: {
-    color: '#15803d',
-    fontWeight: '800',
   },
   scannerCard: {
     backgroundColor: WiseColors.canvas,
