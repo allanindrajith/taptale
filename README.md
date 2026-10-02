@@ -4,14 +4,39 @@
 
 # TapTale
 
-### *Physical Heritage & Audio Stories Unlocked at Real-World Monuments via NFC*
+### **Smart Heritage Audio Guides, Physical Monument Tagging & Cryptographic Digital Passports Across Lithuania**
 
+<br />
+
+<!-- Feature & Status Badges -->
 <p align="center">
-  <img src="https://img.shields.io/badge/Platform-iOS%20%7C%20Android%20%7C%20Web-blue?style=for-the-badge&logo=apple&logoColor=white" alt="Platforms" />
-  <img src="https://img.shields.io/badge/Expo-SDK%2052-000020?style=for-the-badge&logo=expo&logoColor=white" alt="Expo SDK 52" />
-  <img src="https://img.shields.io/badge/NFC-NTAG213%2F215%2F216-9fe870?style=for-the-badge&logo=nfc&logoColor=black" alt="NFC Powered" />
-  <img src="https://img.shields.io/badge/TypeScript-Strict-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
-  <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License MIT" />
+  <a href="https://github.com/allanindrajith/taptale"><img src="https://img.shields.io/badge/DEMO-APP_PREVIEW-e5ad06?style=for-the-badge&logo=googlechrome&logoColor=white&labelColor=2b2b2b" alt="Demo Preview" /></a>
+  <a href="#-how-it-works-the-explorer-journey"><img src="https://img.shields.io/badge/NFC_TAGGING-INTERACTIVE_UNLOCKED-9b51e0?style=for-the-badge&logo=nfc&logoColor=white&labelColor=2b2b2b" alt="NFC Tagging" /></a>
+  <img src="https://img.shields.io/badge/STATUS-PRODUCTION_READY-2ecc71?style=for-the-badge&logo=checkmarx&logoColor=white&labelColor=2b2b2b" alt="Status Production Ready" />
+</p>
+
+<!-- Technology Stack Badges -->
+<p align="center">
+  <img src="https://img.shields.io/badge/React_Native-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" alt="React Native" />
+  <img src="https://img.shields.io/badge/Expo-SDK_52-000020?style=for-the-badge&logo=expo&logoColor=white" alt="Expo" />
+  <img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/NFC_Core-9fe870?style=for-the-badge&logo=nfc&logoColor=0e0f0c" alt="NFC" />
+  <img src="https://img.shields.io/badge/Expo_Router-5856D6?style=for-the-badge&logo=expo&logoColor=white" alt="Expo Router" />
+  <img src="https://img.shields.io/badge/Audio_AV-E65100?style=for-the-badge&logo=soundcharts&logoColor=white" alt="Audio AV" />
+  <img src="https://img.shields.io/badge/Location_GPS-00897B?style=for-the-badge&logo=googlemaps&logoColor=white" alt="Location GPS" />
+</p>
+
+---
+
+<!-- Quick Anchor Navigation Bar -->
+<p align="center">
+  <a href="#-core-features"><b>Key Features</b></a> &nbsp;•&nbsp;
+  <a href="#-heritage-spotlight-explore-lithuania"><b>Heritage Showcase</b></a> &nbsp;•&nbsp;
+  <a href="#%EF%B8%8F-tech-stack--architecture"><b>Architecture</b></a> &nbsp;•&nbsp;
+  <a href="#-getting-started"><b>Development</b></a> &nbsp;•&nbsp;
+  <a href="#%EF%B8%8F-nfc-tag-writing-specification"><b>NFC & Tag Specs</b></a> &nbsp;•&nbsp;
+  <a href="#-the-power-of-nfc-why-tapping-matters"><b>Security</b></a> &nbsp;•&nbsp;
+  <a href="#-license"><b>License</b></a>
 </p>
 
 ---
