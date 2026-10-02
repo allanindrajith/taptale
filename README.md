@@ -263,5 +263,5 @@ This project is open-source under the [MIT License](LICENSE).
 ---
 
 <div align="center">
-  Crafted with passion for heritage preservation and real-world exploration by <a href="https://github.com/allanindrajith">Allan Indrajith</a>.
+  Crafted with passion for heritage preservation and real-world exploration by <a href="https://itsallan.me" target="_blank"><b>Allan Indrajith</b></a> &bull; <a href="https://itsallan.me"><b>itsallan.me</b></a>
 </div>
