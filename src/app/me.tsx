@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Alert,
   Image,
   Modal,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -30,7 +31,7 @@ import {
   DEMO_ACCOUNT,
 } from '@/services/user-storage';
 import { UnlockService } from '@/services/unlock-storage';
-import { AppleLogo, GoogleLogo, MailIcon } from '@/components/brand-icons';
+import { AppleLogo, GoogleLogo, MailIcon, UserIcon } from '@/components/brand-icons';
 import { useLanguage } from '@/hooks/use-language';
 
 export default function AccountScreen() {
@@ -53,6 +54,9 @@ export default function AccountScreen() {
   // Status feedback toast/banner
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
+  // Pull-to-refresh state
+  const [refreshing, setRefreshing] = useState(false);
+
   useEffect(() => {
     refreshData();
     const unsubscribe = UserService.subscribe(() => {
@@ -67,6 +71,17 @@ export default function AccountScreen() {
     setTimeline(UserService.getVisitTimeline());
   }
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      refreshData();
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      refreshData();
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
+
   function showBanner(msg: string) {
     setStatusMessage(msg);
     setTimeout(() => {
@@ -77,12 +92,12 @@ export default function AccountScreen() {
   // Auth actions
   function handleConnectApple() {
     UserService.connectApple('Traveler Allan', 'allan.traveler@icloud.com');
-    showBanner('🍏 Connected with Apple ID! All passes and badges synced to iCloud.');
+    showBanner('Connected with Apple ID! All passes and badges synced to iCloud.');
   }
 
   function handleConnectGoogle() {
     UserService.connectGoogle('Allan Indrajith', 'allan.indrajith@gmail.com');
-    showBanner('🌐 Connected with Google! Cloud sync active.');
+    showBanner('Connected with Google! Cloud sync active.');
   }
 
   function handleConnectEmailSubmit() {
@@ -146,7 +161,16 @@ export default function AccountScreen() {
     <View style={styles.container}>
       <ScrollView
         contentContainerStyle={[styles.scrollContent, { paddingTop: topInset + 12 }]}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={WiseColors.forestGreen}
+            colors={[WiseColors.forestGreen]}
+            progressBackgroundColor={WiseColors.canvas}
+          />
+        }>
         
         {/* Screen Header */}
         <View style={styles.headerRow}>
@@ -206,12 +230,30 @@ export default function AccountScreen() {
 
               {/* Provider Badge */}
               <View style={styles.providerPill}>
-                <Text style={styles.providerText}>
-                  {profile.provider === 'apple' && '🍏 Apple Account'}
-                  {profile.provider === 'google' && '🌐 Google Account'}
-                  {profile.provider === 'email' && '✉️ Email Account'}
-                  {profile.provider === 'guest' && '👤 Guest Explorer'}
-                </Text>
+                {profile.provider === 'apple' && (
+                  <View style={styles.providerContentRow}>
+                    <AppleLogo size={13} color={WiseColors.primary} />
+                    <Text style={styles.providerText}>Apple Account</Text>
+                  </View>
+                )}
+                {profile.provider === 'google' && (
+                  <View style={styles.providerContentRow}>
+                    <GoogleLogo size={13} />
+                    <Text style={styles.providerText}>Google Account</Text>
+                  </View>
+                )}
+                {profile.provider === 'email' && (
+                  <View style={styles.providerContentRow}>
+                    <MailIcon size={13} color={WiseColors.primary} />
+                    <Text style={styles.providerText}>Email Account</Text>
+                  </View>
+                )}
+                {profile.provider === 'guest' && (
+                  <View style={styles.providerContentRow}>
+                    <UserIcon size={13} color={WiseColors.primary} />
+                    <Text style={styles.providerText}>Guest Explorer</Text>
+                  </View>
+                )}
                 {profile.cloudSyncEnabled && (
                   <Text style={styles.syncDot}> • Cloud Sync ON</Text>
                 )}
@@ -420,8 +462,8 @@ export default function AccountScreen() {
               </Text>
               <Text style={styles.emptyDesc}>
                 {language === 'lt'
-                  ? 'Eikite į Pradžią arba Naršyti, suraskite istorinę vietą ir nuskaitykite NFC lentelę arba suveskite kodą!'
-                  : 'Visit historical spots in Vilnius, Trakai, or Šiauliai and tap the physical NFC tag to unlock 30-day passes and record your timeline!'}
+                  ? 'Eikite į Pradžią arba Naršyti, suraskite istorinę vietą Vilniuje, Kaune, Palangoje, Trakuose ar Šiauliuose ir nuskaitykite NFC lentelę arba suveskite kodą!'
+                  : 'Visit historical spots in Vilnius, Kaunas, Palanga, Trakai, or Šiauliai and tap the physical NFC tag to unlock 30-day passes and record your timeline!'}
               </Text>
             </View>
           ) : (
@@ -787,19 +829,45 @@ export default function AccountScreen() {
                 </Text>
                 <Text style={styles.badgeDetailLoreText}>
                   {selectedBadge.id === 'badge-first-tap' &&
-                    'Visit any historical landmark in Lithuania and tap the physical NFC plaque or enter the site passkey.'}
+                    (language === 'lt'
+                      ? 'Aplankykite bet kurį istorinį objektą Lietuvoje ir priglauskite telefoną prie NFC žymos arba įveskite kodą.'
+                      : 'Visit any historical landmark in Lithuania and tap the physical NFC plaque or enter the site passkey.')}
                   {selectedBadge.id === 'badge-castle-master' &&
-                    "Visit both Gediminas' Castle Tower in Vilnius and the Medieval Island Fortress in Trakai."}
+                    (language === 'lt'
+                      ? 'Aplankykite Gedimino pilies bokštą Vilniuje ir Trakų salos pilį.'
+                      : "Visit both Gediminas' Castle Tower in Vilnius and the Medieval Island Fortress in Trakai.")}
                   {selectedBadge.id === 'badge-sacred-pilgrim' &&
-                    'Visit Vilnius Cathedral Basilica, the miraculous Gate of Dawn chapel, and the sacred Hill of Crosses in Šiauliai.'}
+                    (language === 'lt'
+                      ? 'Aplankykite Vilniaus Katedrą, Aušros Vartus ir Kryžių Kalną prie Šiaulių.'
+                      : 'Visit Vilnius Cathedral Basilica, the miraculous Gate of Dawn chapel, and the sacred Hill of Crosses in Šiauliai.')}
                   {selectedBadge.id === 'badge-bohemian-citizen' &&
-                    'Visit the artistic Republic of Užupis and tap the plaque near the Bronze Angel of Freedom.'}
+                    (language === 'lt'
+                      ? 'Apsilankykite meniškoje Užupio Respublikoje ir nuskaitykite žymą prie Užupio Angelo.'
+                      : 'Visit the artistic Republic of Užupis and tap the plaque near the Bronze Angel of Freedom.')}
                   {selectedBadge.id === 'badge-vilnius-scholar' &&
-                    'Visit Vilnius University Old Town campus and walk its 13 Renaissance and Baroque courtyards.'}
+                    (language === 'lt'
+                      ? 'Aplankykite Vilniaus universiteto senamiesčio ansamblį ir pasivaikščiokite po jo istorinius kiemelius.'
+                      : 'Visit Vilnius University Old Town campus and walk its 13 Renaissance and Baroque courtyards.')}
+                  {selectedBadge.id === 'badge-vilnius-master' &&
+                    (language === 'lt'
+                      ? 'Atrakinkite bent 5 skirtingas istorines vietas Vilniuje ir tapkite sostinės žinovu.'
+                      : 'Unlock at least 5 different historic monuments across Vilnius to become an Old Town Master.')}
+                  {selectedBadge.id === 'badge-kaunas-explorer' &&
+                    (language === 'lt'
+                      ? 'Aplankykite bent 2 istorines vietas Kaune (pvz., Kauno pilį, Pažaislį ar Rotušę).'
+                      : 'Visit at least 2 historical sites in Kaunas, such as Kaunas Castle, Pažaislis, or the Town Hall.')}
+                  {selectedBadge.id === 'badge-palanga-coast' &&
+                    (language === 'lt'
+                      ? 'Aplankykite bent 2 pajūrio vietas Palangoje (pvz., Palangos tiltą į jūrą, Gintaro muziejų ar Birutės kalną).'
+                      : 'Visit at least 2 coastal landmarks in Palanga, such as the Sea Pier, Amber Museum, or Birutė Hill.')}
                   {selectedBadge.id === 'badge-pass-guardian' &&
-                    'Maintain 3 or more active 30-day NFC passes at the same time.'}
+                    (language === 'lt'
+                      ? 'Išlaikykite bent 3 aktyvius 30 dienų NFC leidimus vienu metu.'
+                      : 'Maintain 3 or more active 30-day NFC passes at the same time.')}
                   {selectedBadge.id === 'badge-grand-explorer' &&
-                    'Unlock all 7 national heritage sites across Lithuania to become a Grand Explorer!'}
+                    (language === 'lt'
+                      ? 'Atrakinkite visas istorines vietas visoje Lietuvoje ir tapkite Didžiuoju Lietuvos Tyrinėtoju!'
+                      : 'Unlock all historical heritage sites across Lithuania to become a Grand Explorer!')}
                 </Text>
               </View>
 
@@ -971,6 +1039,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 6,
+  },
+  providerContentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
   },
   providerText: {
     fontSize: 12,

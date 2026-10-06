@@ -147,15 +147,27 @@ export function SpotStoryModal({
 
   // Passkey prompt allowing direct entry of cryptographic passkey from the plaque
   const handleEnterPasskey = () => {
+    const distanceMeters = Math.round(distanceKm * 1000);
+    if (distanceMeters > 10) {
+      Alert.alert(
+        language === 'lt' ? 'Atstumo patikra nepavyko' : 'Proximity Verification Failed',
+        language === 'lt'
+          ? `Esate ${distanceMeters >= 1000 ? distanceKm.toFixed(1) + ' km' : distanceMeters + ' m'} atstumu nuo „${resolveText(spot.title, language)}“. Lentelės kodas galioja tik būnant arčiau nei 10 metrų nuo fizinės lentelės.`
+          : `You are ${distanceMeters >= 1000 ? distanceKm.toFixed(1) + ' km' : distanceMeters + ' m'} away from "${resolveText(spot.title, language)}". Plaque passkeys can only be validated within 10 meters of the physical monument.`
+      );
+      return;
+    }
+
     if (Platform.OS === 'ios') {
       Alert.prompt(
         language === 'lt' ? '🔑 Įveskite lentelės kodą' : '🔑 Enter Plaque Passkey',
         language === 'lt'
-          ? `Įveskite fizinėje lentelėje prie „${resolveText(spot.title, language)}“ esantį kodą:`
-          : `Enter the passkey engraved on the physical "${resolveText(spot.title, language)}" plaque:`,
+          ? `Esate ${distanceMeters} m atstumu nuo „${resolveText(spot.title, language)}“ (zona: ≤10 m). Įveskite fizinėje lentelėje iškaltą kodą (pvz., ${spot.nfcSecretKey}):`
+          : `You are ${distanceMeters}m from "${resolveText(spot.title, language)}" (in range: ≤10m). Enter the code engraved on the plaque:`,
         (enteredKey) => {
           if (!enteredKey) return;
-          const res = UnlockService.validateAndUnlock(spot.id, enteredKey.trim(), spot.nfcSecretKey);
+          const cleanKey = enteredKey.trim().toUpperCase();
+          const res = UnlockService.validateAndUnlock(spot.id, cleanKey, spot.nfcSecretKey);
           if (res.success) {
             setIsUnlocked(true);
             setDaysRemaining(30);
@@ -168,15 +180,23 @@ export function SpotStoryModal({
           } else {
             Alert.alert(
               language === 'lt' ? '❌ Neteisingas kodas' : '❌ Invalid Passkey',
-              res.message
+              language === 'lt'
+                ? 'Įvestas kodas nesutampa su šios lentelės kodu. Patikrinkite raides ir skaičius.'
+                : 'The entered passkey does not match this plaque. Please check the engraved letters and numbers.'
             );
           }
         },
         'plain-text',
-        spot.nfcSecretKey
+        ''
       );
     } else {
-      handleDirectUnlock();
+      // Android fallback: Prompt message with verification instructions
+      Alert.alert(
+        language === 'lt' ? '🔑 Lentelės kodo patvirtinimas' : '🔑 Plaque Passkey',
+        language === 'lt'
+          ? `Esate ${distanceMeters} m atstumu (reikalinga ≤10 m). Norėdami patvirtinti prieigą, priglauskite telefoną arba naudokite pagrindinį kodo įvedimo langą.`
+          : `You are ${distanceMeters}m away (≤10m required). To verify access, hold phone to NFC or use the main passkey prompt.`
+      );
     }
   };
 
@@ -198,21 +218,18 @@ export function SpotStoryModal({
       } else {
         if (result.message?.includes('cancelled')) return;
 
-        // Physical verification fallback options: Direct tap or Passkey
+        // Physical verification fallback options: Passkey within 10m
+        const distanceMeters = Math.round(distanceKm * 1000);
         Alert.alert(
-          language === 'lt' ? '🏷️ NFC Lentelės Patvirtinimas' : '🏷️ NFC Plaque Verification',
+          language === 'lt' ? '🏷️ NFC Nepavyko / Nėra' : '🏷️ NFC Unavailable / Failed',
           language === 'lt'
-            ? `Ar esate prie „${resolveText(spot.title, language)}“? Galite patvirtinti prieigą prilietę lentelę arba įvedę lentelės kodą (${spot.nfcSecretKey}).`
-            : `Are you at "${resolveText(spot.title, language)}"? You can verify access by tapping the plaque or entering the plaque passkey (${spot.nfcSecretKey}).`,
+            ? `NFC nuskaitymas neįvyko (${result.message}). Esate ${distanceMeters} m atstumu nuo objekto. Galite įvesti fizinės lentelės kodą (leidžiama tik iki 10 m atstumu).`
+            : `NFC scan failed or unavailable (${result.message}). You are ${distanceMeters}m from the spot. You can enter the plaque passkey (only valid within 10 meters).`,
           [
             { text: language === 'lt' ? 'Atšaukti' : 'Cancel', style: 'cancel' },
             {
-              text: language === 'lt' ? '🔑 Įvesti kodą' : '🔑 Enter Passkey',
+              text: language === 'lt' ? '🔑 Įvesti lentelės kodą (≤10m)' : '🔑 Enter Plaque Passkey (≤10m)',
               onPress: handleEnterPasskey,
-            },
-            {
-              text: language === 'lt' ? '🏷️ Priliesti lentelę' : '🏷️ Tap Plaque Now',
-              onPress: handleDirectUnlock,
             },
           ]
         );
@@ -984,16 +1001,40 @@ export function SpotStoryModal({
                   styles.scanNfcButton,
                   pressed && styles.scanNfcButtonPressed,
                 ]}>
-                <Text style={styles.scanNfcButtonText}>
-                  {isScanningNFC
-                    ? language === 'lt'
-                      ? 'Nuskaitoma NFC žyma…'
-                      : 'Connecting to NFC plaque…'
-                    : language === 'lt'
-                    ? '🏷️ Priliesti NFC žymą (Skenuoti)'
-                    : '🏷️ Tap Physical NFC Plaque'}
-                </Text>
+                <View style={styles.modalNfcBtnContent}>
+                  <View style={styles.modalNfcIconBubble}>
+                    <Text style={styles.modalNfcIconSymbol}>📡</Text>
+                  </View>
+                  <View style={styles.modalNfcTextGroup}>
+                    <Text style={styles.scanNfcButtonText}>
+                      {isScanningNFC
+                        ? language === 'lt'
+                          ? 'Nuskaitoma NFC žyma…'
+                          : 'Connecting to NFC plaque…'
+                        : language === 'lt'
+                        ? 'Priliesti fizinę NFC žymą'
+                        : 'Scan Physical NFC Plaque'}
+                    </Text>
+                    <Text style={styles.scanNfcButtonSubtext}>
+                      {language === 'lt'
+                        ? 'Priglauskite telefoną prie paveldo lentelės'
+                        : 'Hold phone against the brass plaque'}
+                    </Text>
+                  </View>
+                  <View style={styles.modalNfcArrowCircle}>
+                    <Text style={styles.modalNfcArrow}>→</Text>
+                  </View>
+                </View>
               </Pressable>
+
+              {/* Subtle OR Divider */}
+              <View style={styles.modalActionDivider}>
+                <View style={styles.modalActionDividerLine} />
+                <Text style={styles.modalActionDividerText}>
+                  {language === 'lt' ? 'ARBA' : 'OR'}
+                </Text>
+                <View style={styles.modalActionDividerLine} />
+              </View>
 
               {/* Enter Plaque Passkey Button */}
               <Pressable
@@ -1002,9 +1043,29 @@ export function SpotStoryModal({
                   styles.passkeyButton,
                   pressed && styles.passkeyButtonPressed,
                 ]}>
-                <Text style={styles.passkeyButtonText}>
-                  🔑 {language === 'lt' ? 'Įvesti lentelės kodą' : 'Enter Plaque Passkey'}
-                </Text>
+                <View style={styles.modalPasskeyLeft}>
+                  <View style={styles.modalPasskeyIconWrap}>
+                    <Text style={styles.modalPasskeyIcon}>🔑</Text>
+                  </View>
+                  <View style={styles.modalPasskeyTextCol}>
+                    <View style={styles.modalPasskeyTitleRow}>
+                      <Text style={styles.passkeyButtonText}>
+                        {language === 'lt' ? 'Neturite NFC? Įvesti kodą' : 'No NFC? Enter plaque passkey'}
+                      </Text>
+                      <View style={styles.modalPasskeyBadge}>
+                        <Text style={styles.modalPasskeyBadgeText}>≤ 10m</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.passkeyButtonSubtext}>
+                      {language === 'lt'
+                        ? 'Iškaltas fizinėje lentelėje prie objekto'
+                        : 'Engraved on the physical monument plaque'}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.modalPasskeyChevronWrap}>
+                  <Text style={styles.modalPasskeyChevron}>›</Text>
+                </View>
               </Pressable>
 
               <Text style={styles.lockedDisclaimer}>
@@ -1836,45 +1897,167 @@ const styles = StyleSheet.create({
   scanNfcButton: {
     width: '100%',
     backgroundColor: WiseColors.primary,
-    paddingVertical: 14,
+    paddingVertical: 13,
+    paddingHorizontal: 16,
     borderRadius: Rounded.pill,
-    alignItems: 'center',
     marginTop: 4,
     shadowColor: WiseColors.primary,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.28,
+    shadowRadius: 10,
+    elevation: 4,
   },
   scanNfcButtonPressed: {
     backgroundColor: WiseColors.primaryActive,
     transform: [{ scale: 0.99 }],
   },
+  modalNfcBtnContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    width: '100%',
+  },
+  modalNfcIconBubble: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalNfcIconSymbol: {
+    fontSize: 16,
+  },
+  modalNfcTextGroup: {
+    flex: 1,
+  },
   scanNfcButtonText: {
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '900',
-    letterSpacing: -0.2,
+    letterSpacing: -0.3,
+  },
+  scanNfcButtonSubtext: {
+    color: 'rgba(255, 255, 255, 0.78)',
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 1,
+  },
+  modalNfcArrowCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+  modalNfcArrow: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  modalActionDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    paddingVertical: 2,
+    gap: 12,
+  },
+  modalActionDividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E2E7E4',
+  },
+  modalActionDividerText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#94A399',
+    letterSpacing: 1,
   },
   passkeyButton: {
     width: '100%',
-    backgroundColor: WiseColors.canvas,
-    borderWidth: 1.5,
-    borderColor: WiseColors.primary,
-    borderRadius: Rounded.pill,
-    paddingVertical: 12,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
+    justifyContent: 'space-between',
+    backgroundColor: '#F6F9F7',
+    borderWidth: 1.5,
+    borderColor: '#D7E5DC',
+    borderRadius: Rounded.xl,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
   },
   passkeyButtonPressed: {
-    backgroundColor: WiseColors.primaryPale,
+    backgroundColor: '#EBF2EE',
+    borderColor: WiseColors.primary,
     transform: [{ scale: 0.99 }],
   },
+  modalPasskeyLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  modalPasskeyIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#E5F0E9',
+    borderWidth: 1,
+    borderColor: '#CEE0D4',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalPasskeyIcon: {
+    fontSize: 16,
+  },
+  modalPasskeyTextCol: {
+    flex: 1,
+    gap: 2,
+  },
+  modalPasskeyTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   passkeyButtonText: {
-    color: WiseColors.primary,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '800',
+    color: WiseColors.ink,
     letterSpacing: -0.2,
+  },
+  passkeyButtonSubtext: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: WiseColors.body,
+    lineHeight: 15,
+  },
+  modalPasskeyBadge: {
+    backgroundColor: '#D7EDE0',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: Rounded.pill,
+  },
+  modalPasskeyBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: WiseColors.forestGreen,
+    letterSpacing: 0.2,
+  },
+  modalPasskeyChevronWrap: {
+    marginLeft: 6,
+    paddingHorizontal: 4,
+  },
+  modalPasskeyChevron: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#8A9C90',
+    lineHeight: 24,
   },
   lockedDisclaimer: {
     fontSize: 12,

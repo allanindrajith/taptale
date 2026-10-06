@@ -230,38 +230,52 @@ export const AudioService = {
 
     switch (spotId) {
       case 'vln-cathedral-square':
+      case 'vln-st-anne-church':
+      case 'kns-town-hall':
         // CATHEDRAL BELLS & SACRED CHORAL HYMN
         this.startCathedralBells(ctx, masterGain);
         break;
 
       case 'vln-gediminas-tower':
+      case 'plg-birute-hill':
         // ANCIENT BALTIC HORNS & KANKLĖS DRONE
         this.startKanklesAndHorn(ctx, masterGain);
         break;
 
       case 'vln-gate-of-dawn':
+      case 'vln-peter-paul-church':
+      case 'kns-pazaislis-monastery':
         // BAROQUE ORGAN PRELUDE & SACRED CHANT
         this.startBaroqueOrgan(ctx, masterGain);
         break;
 
       case 'vln-university':
+      case 'vln-grand-dukes-palace':
+      case 'plg-amber-museum':
         // RENAISSANCE HARPSICHORD & SCHOLASTIC STRINGS
         this.startHarpsichord(ctx, masterGain);
         break;
 
       case 'vln-uzupis':
-        // BOHEMIAN ACOUSTIC GUITAR & VILNELĖ RIVER
+      case 'vln-bernardine-garden':
+      case 'kns-aleksotas-funicular':
+        // BOHEMIAN ACOUSTIC GUITAR & RIVER RHYTHMS
         this.startUzupisGuitar(ctx, masterGain);
         break;
 
       case 'trk-island-castle':
+      case 'vln-bastion':
+      case 'kns-kaunas-castle':
         // MEDIEVAL KETTLE DRUMS & CASTLE WINDS
         this.startMedievalDrums(ctx, masterGain);
         break;
 
       case 'sia-hill-of-crosses':
+      case 'vln-three-crosses':
+      case 'kns-ninth-fort':
+      case 'plg-sea-pier':
       default:
-        // ROSARY WIND CHIMES & SERENE MEDITATION
+        // ROSARY WIND CHIMES, SEA BREEZE & SERENE MEDITATION
         this.startWindChimes(ctx, masterGain);
         break;
     }

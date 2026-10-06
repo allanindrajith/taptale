@@ -46,6 +46,9 @@ export const NfcService = {
    */
   async isEnabled(): Promise<boolean> {
     if (!NfcManager) return false;
+    if (Platform.OS === 'ios') {
+      return this.isHardwareSupported();
+    }
     try {
       const enabled = await NfcManager.isEnabled();
       return !!enabled;
@@ -61,11 +64,18 @@ export const NfcService = {
     if (!NfcManager) return false;
     if (isNfcInitialized) return true;
     try {
+      const supported = await this.isHardwareSupported();
+      if (!supported) {
+        return false;
+      }
       await NfcManager.start();
       isNfcInitialized = true;
       return true;
-    } catch (e) {
-      console.warn('NFC init error:', e);
+    } catch (e: any) {
+      const errMsg = String(e?.message || e || '');
+      if (!errMsg.toLowerCase().includes('not support')) {
+        console.warn('NFC init error:', e);
+      }
       return false;
     }
   },
@@ -125,7 +135,29 @@ export const NfcService = {
    */
   async scanPhysicalTag(targetSpot?: Spot): Promise<NfcScanResult> {
     try {
-      await this.init();
+      const supported = await this.isHardwareSupported();
+      if (!supported) {
+        return {
+          success: false,
+          hardwareMissing: true,
+          message:
+            Platform.OS === 'ios'
+              ? 'NFC tag reading is not available on this device or simulator. Hold a physical iPhone near the plaque or use passkey verification.'
+              : 'NFC hardware is not supported on this device.',
+        };
+      }
+
+      const initialized = await this.init();
+      if (!initialized) {
+        return {
+          success: false,
+          hardwareMissing: true,
+          message:
+            Platform.OS === 'ios'
+              ? 'Could not start CoreNFC session. Ensure NFC capability is enabled.'
+              : 'NFC reading session could not be started.',
+        };
+      }
 
       // Request NDEF technology reading session (triggers native iOS CoreNFC modal or Android scan)
       if (Platform.OS === 'ios') {

@@ -1,6 +1,6 @@
 {
   "name": "taptale",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Physical heritage & audio stories unlocked at real-world monuments across Lithuania via cryptographic NFC plaques",
   "main": "expo-router/entry",
   "dependencies": {

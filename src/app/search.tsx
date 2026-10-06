@@ -1,8 +1,9 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Image,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -27,6 +28,7 @@ import { Spacing, WiseColors } from '@/constants/theme';
 import { LocationService, LocationState } from '@/services/location-service';
 import { UnlockService } from '@/services/unlock-storage';
 import { useLanguage } from '@/hooks/use-language';
+import { SearchIcon } from '@/components/brand-icons';
 
 export default function SearchScreen() {
   const insets = useSafeAreaInsets();
@@ -40,6 +42,22 @@ export default function SearchScreen() {
 
   // User location: live GPS with simulation fallback
   const [locationState, setLocationState] = useState<LocationState>(LocationService.getCoords());
+
+  // Pull-to-refresh state
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await LocationService.initRealTimeLocation();
+      setLocationState(LocationService.getCoords());
+      await new Promise((resolve) => setTimeout(resolve, 600));
+    } catch (e) {
+      // ignore
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
     const unsub = LocationService.subscribe(() => {
@@ -64,17 +82,44 @@ export default function SearchScreen() {
       }
 
       // Category filter
-      if (selectedCategory === 'castle' && !spot.id.includes('castle') && !spot.id.includes('tower')) {
-        return false;
+      if (selectedCategory === 'castle') {
+        const isCastle =
+          spot.id.includes('castle') ||
+          spot.id.includes('tower') ||
+          spot.id.includes('bastion') ||
+          spot.id.includes('fort') ||
+          spot.id.includes('palace');
+        if (!isCastle) return false;
       }
-      if (selectedCategory === 'sacred' && !spot.id.includes('cathedral') && !spot.id.includes('dawn') && !spot.id.includes('crosses')) {
-        return false;
+      if (selectedCategory === 'sacred') {
+        const isSacred =
+          spot.id.includes('cathedral') ||
+          spot.id.includes('dawn') ||
+          spot.id.includes('cross') ||
+          spot.id.includes('church') ||
+          spot.id.includes('monastery') ||
+          spot.id.includes('hill');
+        if (!isSacred) return false;
       }
-      if (selectedCategory === 'culture' && !spot.id.includes('uzupis')) {
-        return false;
+      if (selectedCategory === 'culture') {
+        const isCulture =
+          spot.id.includes('uzupis') ||
+          spot.id.includes('museum') ||
+          spot.id.includes('pier') ||
+          spot.id.includes('funicular') ||
+          spot.id.includes('garden') ||
+          spot.id.includes('town-hall');
+        if (!isCulture) return false;
       }
-      if (selectedCategory === 'historic' && !spot.id.includes('university')) {
-        return false;
+      if (selectedCategory === 'historic') {
+        const isHistoric =
+          spot.id.includes('university') ||
+          spot.id.includes('town-hall') ||
+          spot.id.includes('palace') ||
+          spot.id.includes('monastery') ||
+          spot.id.includes('fort') ||
+          spot.id.includes('bastion');
+        if (!isHistoric) return false;
       }
 
       // Search query matching (title, teaser, activities, city)
@@ -122,7 +167,16 @@ export default function SearchScreen() {
     <View style={styles.container}>
       <ScrollView
         contentContainerStyle={[styles.scrollContent, { paddingTop: topInset + 8 }]}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={WiseColors.forestGreen}
+            colors={[WiseColors.forestGreen]}
+            progressBackgroundColor={WiseColors.canvas}
+          />
+        }>
 
         {/* Header */}
         <View style={styles.headerRow}>
@@ -150,7 +204,7 @@ export default function SearchScreen() {
 
         {/* Search Bar Input */}
         <View style={styles.searchBarWrap}>
-          <Text style={styles.searchIcon}>🔍</Text>
+          <SearchIcon size={18} color="#9ca3af" style={styles.searchIconBox} />
           <TextInput
             style={styles.searchInput}
             placeholder={
@@ -254,7 +308,7 @@ export default function SearchScreen() {
         {/* Spots Results List */}
         {filteredSpots.length === 0 ? (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyIcon}>🔍</Text>
+            <SearchIcon size={44} color={WiseColors.mute} style={styles.emptyIconBox} />
             <Text style={styles.emptyTitle}>
               {language === 'lt' ? 'Rezultatų nerasta' : 'No Landmarks Found'}
             </Text>
@@ -446,8 +500,7 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
   },
-  searchIcon: {
-    fontSize: 16,
+  searchIconBox: {
     marginRight: 10,
   },
   searchInput: {
@@ -637,9 +690,8 @@ const styles = StyleSheet.create({
     borderColor: WiseColors.forestBorder,
     marginTop: 20,
   },
-  emptyIcon: {
-    fontSize: 44,
-    marginBottom: 10,
+  emptyIconBox: {
+    marginBottom: 12,
   },
   emptyTitle: {
     fontSize: 16,

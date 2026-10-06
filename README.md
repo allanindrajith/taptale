@@ -100,7 +100,7 @@ Across cities and cultural landscapes, physical **TapTale NFC plaques** are moun
 
 ## 🏰 Heritage Spotlight: Explore Lithuania
 
-TapTale’s premiere registry features the legendary landmarks and secret corners of Lithuania:
+TapTale’s nationwide registry covers 21 legendary landmarks across **Vilnius**, **Kaunas**, **Palanga**, **Trakai**, and **Šiauliai**:
 
 <table>
   <tr>
@@ -109,6 +109,26 @@ TapTale’s premiere registry features the legendary landmarks and secret corner
       <br />
       <b>🗼 Gediminas Tower</b>
       <p><i>Vilnius • High Castle</i><br />The cradle of Lithuania's capital. Legend of the howling Iron Wolf dreamt by Grand Duke Gediminas.</p>
+    </td>
+    <td width="33%" align="center">
+      <img src="assets/images/st_anne_church.jpg" alt="St. Anne's Church" width="100%" style="border-radius: 12px; aspect-ratio: 16/10; object-fit: cover;" />
+      <br />
+      <b>⛪ St. Anne's Church</b>
+      <p><i>Vilnius • Old Town</i><br />Flamboyant Gothic jewel crafted from 33 distinct clay brick shapes, immortalized in Napoleon legend.</p>
+    </td>
+    <td width="33%" align="center">
+      <img src="assets/images/grand_dukes_palace.jpg" alt="Grand Dukes Palace" width="100%" style="border-radius: 12px; aspect-ratio: 16/10; object-fit: cover;" />
+      <br />
+      <b>🏛️ Palace of the Grand Dukes</b>
+      <p><i>Vilnius • Lower Castle</i><br />Renaissance and Baroque royal seat of Lithuanian sovereigns, archaeological excavations and throne halls.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="33%" align="center">
+      <img src="assets/images/three_crosses.jpg" alt="Three Crosses" width="100%" style="border-radius: 12px; aspect-ratio: 16/10; object-fit: cover;" />
+      <br />
+      <b>✝️ Hill of Three Crosses</b>
+      <p><i>Vilnius • Bleak Hill</i><br />Soaring panoramic beacon honoring 14th-century Franciscan martyrs, resurrected in 1989.</p>
     </td>
     <td width="33%" align="center">
       <img src="assets/images/trakai_castle.jpg" alt="Trakai Island Castle" width="100%" style="border-radius: 12px; aspect-ratio: 16/10; object-fit: cover;" />
@@ -144,6 +164,13 @@ TapTale’s premiere registry features the legendary landmarks and secret corner
     </td>
   </tr>
 </table>
+
+### 📍 Registry Breakdown by City:
+- **Vilnius (11 landmarks)**: Gediminas' Tower, Cathedral Square, Gate of Dawn, Vilnius University, Republic of Užupis, St. Anne's Church, Hill of Three Crosses, Palace of the Grand Dukes of Lithuania, Church of St. Peter and St. Paul, Bastion of the Defensive Wall, Bernardine Garden.
+- **Kaunas (5 landmarks)**: Kaunas Castle, Pažaislis Monastery, Kaunas Town Hall, Aleksotas Funicular & Panorama, Ninth Fort Memorial.
+- **Palanga (3 landmarks)**: Palanga Sea Pier, Palanga Amber Museum & Tiškevičius Palace, Birutė Hill & Sacred Grotto.
+- **Trakai (1 landmark)**: Trakai Island Castle.
+- **Šiauliai region (1 landmark)**: Hill of Crosses.
 
 ---
 

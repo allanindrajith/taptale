@@ -15,6 +15,7 @@ import { SPOTS, Spot, resolveText } from '@/constants/spots';
 import { Rounded, Spacing, WiseColors } from '@/constants/theme';
 import { UnlockService } from '@/services/unlock-storage';
 import { useLanguage } from '@/hooks/use-language';
+import { AppleLogo, GooglePlayLogo } from '@/components/brand-icons';
 
 export default function UnlockScreen() {
   const router = useRouter();
@@ -191,7 +192,7 @@ export default function UnlockScreen() {
                 {/* Dynamic Store Buttons based on User Device OS */}
                 {(deviceOS === 'ios' || deviceOS === 'other') && (
                   <Pressable style={styles.appStoreBtn} onPress={() => handleOpenStore('ios')}>
-                    <Text style={styles.storeBtnIcon}>🍎</Text>
+                    <AppleLogo size={24} color="#ffffff" />
                     <View style={styles.storeBtnTextContainer}>
                       <Text style={styles.storeBtnSub}>Download on the</Text>
                       <Text style={styles.storeBtnTitle}>Apple App Store</Text>
@@ -201,7 +202,7 @@ export default function UnlockScreen() {
 
                 {(deviceOS === 'android' || deviceOS === 'other') && (
                   <Pressable style={styles.playStoreBtn} onPress={() => handleOpenStore('android')}>
-                    <Text style={styles.storeBtnIcon}>🤖</Text>
+                    <GooglePlayLogo size={22} />
                     <View style={styles.storeBtnTextContainer}>
                       <Text style={styles.storeBtnSub}>GET IT ON</Text>
                       <Text style={styles.storeBtnTitle}>Google Play</Text>

@@ -372,6 +372,10 @@ export const UserService = {
     const hasTrakai = unlockedSpotIds.includes('trk-island-castle');
     const hasHill = unlockedSpotIds.includes('sia-hill-of-crosses');
 
+    const vilniusCount = unlockedSpotIds.filter((id) => id.startsWith('vln-')).length;
+    const kaunasCount = unlockedSpotIds.filter((id) => id.startsWith('kns-')).length;
+    const palangaCount = unlockedSpotIds.filter((id) => id.startsWith('plg-')).length;
+
     const badges: AchievementBadge[] = [
       {
         id: 'badge-first-tap',
@@ -435,6 +439,42 @@ export const UserService = {
         isUnlocked: hasUniversity,
       },
       {
+        id: 'badge-vilnius-master',
+        icon: '👑',
+        titleEn: 'Master of Vilnius',
+        titleLt: 'Vilniaus Žinovas',
+        descEn: 'Explore 5 or more historic landmarks across the capital city of Vilnius.',
+        descLt: 'Aplankykite 5 ar daugiau istorinių vietų Lietuvos sostinėje Vilniuje.',
+        category: 'mastery',
+        totalRequired: 5,
+        currentCount: Math.min(5, vilniusCount),
+        isUnlocked: vilniusCount >= 5,
+      },
+      {
+        id: 'badge-kaunas-explorer',
+        icon: '🏰',
+        titleEn: 'Kaunas Fortress Conqueror',
+        titleLt: 'Kauno Tvirtovių Užkariautojas',
+        descEn: 'Discover the historic marvels of Kaunas, including Kaunas Castle and Pažaislis.',
+        descLt: 'Atraskite Kauno istorinį paveldą: Kauno pilį ir Pažaislio vienuolyną.',
+        category: 'discovery',
+        totalRequired: 2,
+        currentCount: Math.min(2, kaunasCount),
+        isUnlocked: kaunasCount >= 2,
+      },
+      {
+        id: 'badge-palanga-coast',
+        icon: '🌊',
+        titleEn: 'Amber Coast Pioneer',
+        titleLt: 'Gintarinio Pajūrio Keliautojas',
+        descEn: 'Breathe the Baltic sea air at Palanga Sea Pier and Birutė Hill.',
+        descLt: 'Įkvėpkite Baltijos dvasios Palangos tilte ir Birutės kalne.',
+        category: 'discovery',
+        totalRequired: 2,
+        currentCount: Math.min(2, palangaCount),
+        isUnlocked: palangaCount >= 2,
+      },
+      {
         id: 'badge-pass-guardian',
         icon: '🛡️',
         titleEn: 'Heritage Guardian',
@@ -451,8 +491,8 @@ export const UserService = {
         icon: '🌟',
         titleEn: 'Grand Explorer of Lithuania',
         titleLt: 'Didysis Lietuvos Tyrinėtojas',
-        descEn: 'Visit all 7 national heritage wonders and collect their complete lore.',
-        descLt: 'Aplankykite visas 7 nacionalines paveldo vietas visoje Lietuvoje.',
+        descEn: `Visit all ${totalPlaces} national heritage wonders across Lithuania.`,
+        descLt: `Aplankykite visas ${totalPlaces} nacionalines paveldo vietas visoje Lietuvoje.`,
         category: 'mastery',
         totalRequired: totalPlaces,
         currentCount: visitedPlacesCount,

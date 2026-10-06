@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   Linking,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,6 +16,7 @@ import { Spacing, WiseColors } from '@/constants/theme';
 import { UnlockService } from '@/services/unlock-storage';
 import { NfcService } from '@/services/nfc-service';
 import { useLanguage } from '@/hooks/use-language';
+import { AppleLogo, AndroidLogo, ClockIcon } from '@/components/brand-icons';
 
 interface StepItem {
   number: string;
@@ -133,6 +135,21 @@ export default function HelpScreen() {
   const [simulatedTapped, setSimulatedTapped] = useState(false);
   const [simulatorStatus, setSimulatorStatus] = useState<string | null>(null);
 
+  // Pull-to-refresh state
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await NfcService.isHardwareSupported();
+      await new Promise((resolve) => setTimeout(resolve, 600));
+    } catch (e) {
+      // ignore
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
+
   async function handleTestNfcHardware() {
     setSimulatedTapped(true);
     const supported = await NfcService.isHardwareSupported();
@@ -161,7 +178,16 @@ export default function HelpScreen() {
     <View style={styles.container}>
       <ScrollView
         contentContainerStyle={[styles.scrollContent, { paddingTop: topInset + 8 }]}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={WiseColors.forestGreen}
+            colors={[WiseColors.forestGreen]}
+            progressBackgroundColor={WiseColors.canvas}
+          />
+        }>
 
         {/* Header */}
         <View style={styles.headerRow}>
@@ -200,19 +226,25 @@ export default function HelpScreen() {
           {/* Phone Position Diagram */}
           <View style={styles.diagramBox}>
             <View style={styles.diagramCol}>
-              <Text style={styles.diagramIcon}>🍏</Text>
+              <View style={styles.diagramIconBox}>
+                <AppleLogo size={24} color={WiseColors.inkDeep} />
+              </View>
               <Text style={styles.diagramLabel}>iPhone</Text>
               <Text style={styles.diagramSub}>Top rear edge</Text>
             </View>
             <View style={styles.diagramDivider} />
             <View style={styles.diagramCol}>
-              <Text style={styles.diagramIcon}>🤖</Text>
+              <View style={styles.diagramIconBox}>
+                <AndroidLogo size={24} color="#3DDC84" />
+              </View>
               <Text style={styles.diagramLabel}>Android</Text>
               <Text style={styles.diagramSub}>Center rear</Text>
             </View>
             <View style={styles.diagramDivider} />
             <View style={styles.diagramCol}>
-              <Text style={styles.diagramIcon}>⏱️</Text>
+              <View style={styles.diagramIconBox}>
+                <ClockIcon size={22} color={WiseColors.primary} />
+              </View>
               <Text style={styles.diagramLabel}>30 Days</Text>
               <Text style={styles.diagramSub}>Pass duration</Text>
             </View>
@@ -450,8 +482,11 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
   },
-  diagramIcon: {
-    fontSize: 22,
+  diagramIconBox: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 4,
   },
   diagramLabel: {

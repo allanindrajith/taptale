@@ -1,16 +1,20 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Alert,
   Image,
+  KeyboardAvoidingView,
   Linking,
+  Modal,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ExpoLinking from 'expo-linking';
 import { useLocalSearchParams } from 'expo-router';
 
@@ -35,15 +39,40 @@ import { useLanguage } from '@/hooks/use-language';
 
 
 export default function HomeScreen() {
+  const insets = useSafeAreaInsets();
+  const topInset = Math.max(insets.top, Platform.OS === 'ios' ? 56 : 24);
   const { language, setLanguage } = useLanguage();
   const [selectedCity, setSelectedCity] = useState<string>('all');
   const [activeSpot, setActiveSpot] = useState<Spot | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [scanMessage, setScanMessage] = useState<string | null>(null);
 
+  // Plaque passkey manual entry modal state (fallback when NFC fails or hardware unavailable)
+  const [isPasskeyModalVisible, setIsPasskeyModalVisible] = useState(false);
+  const [passkeyTargetSpot, setPasskeyTargetSpot] = useState<Spot | null>(null);
+  const [passkeyInput, setPasskeyInput] = useState('');
+  const [passkeyError, setPasskeyError] = useState<string | null>(null);
+
   // User's location: live GPS with simulation fallback
   const [locationState, setLocationState] = useState<LocationState>(LocationService.getCoords());
   const [unlockVersion, setUnlockVersion] = useState(0);
+
+  // Pull-to-refresh state
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await LocationService.initRealTimeLocation();
+      setLocationState(LocationService.getCoords());
+      setUnlockVersion((v) => v + 1);
+      await new Promise((resolve) => setTimeout(resolve, 600));
+    } catch (e) {
+      // ignore
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
 
   // Initialize Real-time Device GPS location
   useEffect(() => {
@@ -152,6 +181,79 @@ export default function HomeScreen() {
 
   // Real physical NFC scanning: Reads tag from physical NFC chip and validates cryptographic key
   // Unlocks that specific place and immediately visits its page (or visits if already unlocked)
+  const openPasskeyModal = (spot?: Spot) => {
+    const target = spot || nearestSpot || SPOTS[0];
+    setPasskeyTargetSpot(target);
+    setPasskeyInput('');
+    setPasskeyError(null);
+    setIsPasskeyModalVisible(true);
+  };
+
+  // Validates passkey input strictly within 10-meter proximity of the plaque
+  const handleVerifyPasskey = () => {
+    const targetSpot = passkeyTargetSpot || nearestSpot || SPOTS[0];
+    const cleanInput = passkeyInput.trim().toUpperCase();
+
+    if (!cleanInput) {
+      setPasskeyError(
+        language === 'lt'
+          ? 'Įveskite lentelės kodą (pvz., VILKAS-1323).'
+          : 'Please enter the plaque passkey (e.g., VILKAS-1323).'
+      );
+      return;
+    }
+
+    // Identify if the code matches this spot or any registered spot in Lithuania
+    const matchedSpot =
+      SPOTS.find((s) => s.nfcSecretKey.toUpperCase() === cleanInput) || targetSpot;
+
+    // Strict 10-meter proximity verification:
+    // Plaque passkeys are physically engraved on the monument and can ONLY be verified within 10 meters!
+    const distKm = calculateDistanceKm(
+      locationState.latitude,
+      locationState.longitude,
+      matchedSpot.latitude,
+      matchedSpot.longitude
+    );
+    const distMeters = Math.round(distKm * 1000);
+
+    if (distMeters > 10) {
+      setPasskeyError(
+        language === 'lt'
+          ? `❌ Atstumo patikra nepavyko: esate ${distMeters >= 1000 ? distKm.toFixed(1) + ' km' : distMeters + ' m'} nuo „${resolveText(matchedSpot.title, language)}“. Šis kodas galioja tik būnant arčiau nei 10 metrų nuo fizinės lentelės.`
+          : `❌ Proximity check failed: You are ${distMeters >= 1000 ? distKm.toFixed(1) + ' km' : distMeters + ' m'} away from "${resolveText(matchedSpot.title, language)}". Plaque passkeys can only be validated within 10 meters of the physical plaque.`
+      );
+      return;
+    }
+
+    // Cryptographic validation against target monument's secret key
+    const res = UnlockService.validateAndUnlock(
+      matchedSpot.id,
+      cleanInput,
+      matchedSpot.nfcSecretKey
+    );
+
+    if (res.success) {
+      setIsPasskeyModalVisible(false);
+      handleUnlockedChange();
+      setActiveSpot(matchedSpot);
+      Alert.alert(
+        language === 'lt' ? '🎉 Fizinė Lentelė Patvirtinta!' : '🎉 Plaque Passkey Verified!',
+        language === 'lt'
+          ? `Sėkmingai patvirtinote „${resolveText(matchedSpot.title, language)}“ (atstumas: ${distMeters} m)! 30 d. prieiga aktyvuota.`
+          : `Successfully verified "${resolveText(matchedSpot.title, language)}" (${distMeters}m away)! 30-day access activated.`
+      );
+    } else {
+      setPasskeyError(
+        language === 'lt'
+          ? '❌ Neteisingas lentelės kodas. Patikrinkite raides ir skaičius fizinėje lentelėje.'
+          : '❌ Invalid plaque passkey. Please check the code engraved on the physical plaque.'
+      );
+    }
+  };
+
+  // Real physical NFC scanning: Reads tag from physical NFC chip and validates cryptographic key
+  // Unlocks that specific place and immediately visits its page (or visits if already unlocked)
   const handleTriggerScan = async (spot?: Spot) => {
     // When called without a spot (from Home button), target is undefined so it accepts ANY TapTale plaque
     const target = spot;
@@ -190,39 +292,22 @@ export default function HomeScreen() {
           );
         }
       } else {
-        // Check if NFC hardware is missing in this test environment (e.g. simulator/dev client)
+        // If NFC hardware is missing or scan failed/unsupported:
+        // Offer the physical plaque passkey option (with 10-meter proximity gate)
         const isSupported = await NfcService.isHardwareSupported();
-        if (!isSupported) {
-          // Provide instant simulation menu so user can test the exact unlock + visit flow
-          const defaultSpot = nearestSpot || SPOTS[0];
+        const fallbackSpot = target || nearestSpot || SPOTS[0];
+
+        if (!isSupported || scanResult.hardwareMissing) {
           Alert.alert(
-            language === 'lt' ? 'NFC Prieigos Testavimas' : 'NFC Heritage Plaque',
+            language === 'lt' ? '🔑 Įveskite lentelės kodą' : '🔑 Enter Plaque Passkey',
             language === 'lt'
-              ? `Fizinis CoreNFC skaitytuvas neaptiktas simuliatoriuje. Ar norite simuliuoti fizinį NFC prilietimą prie artimiausios lentelės (${resolveText(defaultSpot.title, language)})?`
-              : `CoreNFC hardware not present in simulator. Would you like to simulate tapping the nearest physical plaque (${resolveText(defaultSpot.title, language)})?`,
+              ? `NFC funkcija nepasiekiama šiame įrenginyje (${scanResult.message}). Galite įvesti fizinėje lentelėje iškaltą kodą (leidžiama tik būnant iki 10 m nuo objekto).`
+              : `NFC is not available on this device (${scanResult.message}). You can enter the passkey code engraved on the plaque (only valid within 10 meters).`,
             [
               { text: language === 'lt' ? 'Atšaukti' : 'Cancel', style: 'cancel' },
               {
-                text: language === 'lt' ? 'Priliesti lentelę' : 'Tap Plaque Now',
-                onPress: () => {
-                  const wasUnlocked = UnlockService.isUnlocked(defaultSpot.id);
-                  UnlockService.unlockSpot(defaultSpot.id);
-                  handleUnlockedChange();
-                  // Immediately visit that place's page!
-                  setActiveSpot(defaultSpot);
-                  Alert.alert(
-                    wasUnlocked
-                      ? (language === 'lt' ? '🎉 Sveiki sugrįžę!' : '🎉 Welcome Back!')
-                      : (language === 'lt' ? '🎉 Vieta Atrakinta!' : '🎉 Plaque Verified!'),
-                    wasUnlocked
-                      ? (language === 'lt'
-                          ? `„${resolveText(defaultSpot.title, language)}“ jau atrakinta! Atveriame puslapį.`
-                          : `"${resolveText(defaultSpot.title, language)}" is already unlocked! Visiting page now.`)
-                      : (language === 'lt'
-                          ? `Sėkmingai atrakinote „${resolveText(defaultSpot.title, language)}“ 30 dienų! Atveriame puslapį.`
-                          : `Successfully unlocked "${resolveText(defaultSpot.title, language)}" for 30 days! Visiting page now.`)
-                  );
-                },
+                text: language === 'lt' ? '🔑 Įvesti kodą (≤10 m)' : '🔑 Enter Passkey (≤10m)',
+                onPress: () => openPasskeyModal(fallbackSpot),
               },
             ]
           );
@@ -230,16 +315,33 @@ export default function HomeScreen() {
           Alert.alert(
             language === 'lt' ? 'Fizinio NFC Skaitytuvas' : 'Physical NFC Reader',
             scanResult.message,
-            [{ text: language === 'lt' ? 'Supratau' : 'OK' }]
+            [
+              { text: language === 'lt' ? 'Atšaukti' : 'Cancel', style: 'cancel' },
+              {
+                text: language === 'lt' ? '🔑 Įvesti kodą (≤10 m)' : '🔑 Enter Passkey (≤10m)',
+                onPress: () => openPasskeyModal(fallbackSpot),
+              },
+            ]
           );
         }
       }
     } catch (err: any) {
       setIsScanning(false);
       setScanMessage(null);
+      const fallbackSpot = target || nearestSpot || SPOTS[0];
       Alert.alert(
         language === 'lt' ? 'NFC Klaida' : 'NFC Error',
-        err?.message || (language === 'lt' ? 'Nuskaitymas nepavyko.' : 'Scanning cancelled or failed.')
+        (err?.message || (language === 'lt' ? 'Nuskaitymas nepavyko.' : 'Scanning failed.')) +
+          (language === 'lt'
+            ? '\n\nGalite įvesti fizinės lentelės kodą būdami prie objekto (≤10 m).'
+            : '\n\nYou can enter the plaque passkey while standing near the monument (≤10m).'),
+        [
+          { text: language === 'lt' ? 'Atšaukti' : 'Cancel', style: 'cancel' },
+          {
+            text: language === 'lt' ? '🔑 Įvesti kodą (≤10 m)' : '🔑 Enter Passkey (≤10m)',
+            onPress: () => openPasskeyModal(fallbackSpot),
+          },
+        ]
       );
     }
   };
@@ -250,8 +352,19 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+    <View style={styles.rootContainer}>
+      <ScrollView
+        contentContainerStyle={[styles.container, { paddingTop: topInset + Spacing.xs }]}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={WiseColors.forestGreen}
+            colors={[WiseColors.forestGreen]}
+            progressBackgroundColor={WiseColors.canvas}
+          />
+        }>
         {/* Top App Bar & Language Switcher */}
         <View style={styles.topBar}>
           <View style={styles.brandRow}>
@@ -389,28 +502,86 @@ export default function HomeScreen() {
             </Text>
           </View>
 
-          {/* Chunky Dark Forest Green Pill Button */}
-          <Pressable
-            disabled={isScanning}
-            onPress={() => handleTriggerScan()}
-            style={({ pressed }) => [
-              styles.wisePillButton,
-              pressed && styles.wisePillButtonPressed,
-              isScanning && styles.wisePillButtonScanning,
-            ]}>
-            <Text style={styles.wisePillButtonText}>
-              {isScanning
-                ? language === 'lt'
-                  ? 'Nuskaitoma žyma…'
-                  : 'Scanning NFC…'
-                : language === 'lt'
-                ? 'Skenuoti fizinę NFC žymą'
-                : 'Scan Physical NFC Plaque'}
-            </Text>
-            <View style={styles.arrowCircle}>
-              <Text style={styles.arrowCircleText}>→</Text>
+          {/* Action Area: Clear NFC Scan + Intuitive Passkey Fallback */}
+          <View style={styles.scannerActionsContainer}>
+            {/* Primary Action: NFC Scan */}
+            <Pressable
+              disabled={isScanning}
+              onPress={() => handleTriggerScan()}
+              style={({ pressed }) => [
+                styles.wisePillButton,
+                pressed && styles.wisePillButtonPressed,
+                isScanning && styles.wisePillButtonScanning,
+              ]}>
+              <View style={styles.nfcBtnContent}>
+                <View style={styles.nfcIconBubble}>
+                  <Text style={styles.nfcIconSymbol}>📡</Text>
+                </View>
+                <View style={styles.nfcBtnTextGroup}>
+                  <Text style={styles.wisePillButtonText}>
+                    {isScanning
+                      ? language === 'lt'
+                        ? 'Nuskaitoma žyma…'
+                        : 'Scanning NFC…'
+                      : language === 'lt'
+                      ? 'Priliesti fizinę NFC žymą'
+                      : 'Scan Physical NFC Plaque'}
+                  </Text>
+                  <Text style={styles.wisePillButtonSubtext}>
+                    {language === 'lt'
+                      ? 'Priglauskite telefoną prie paveldo lentelės'
+                      : 'Hold phone against the brass plaque'}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.arrowCircle}>
+                <Text style={styles.arrowCircleText}>→</Text>
+              </View>
+            </Pressable>
+
+            {/* Subtle Elegant "OR" Separator */}
+            <View style={styles.actionDividerRow}>
+              <View style={styles.actionDividerLine} />
+              <Text style={styles.actionDividerText}>
+                {language === 'lt' ? 'ARBA' : 'OR'}
+              </Text>
+              <View style={styles.actionDividerLine} />
             </View>
-          </Pressable>
+
+            {/* User-Friendly Secondary Option: Plaque Passkey Entry Card */}
+            <Pressable
+              onPress={() => openPasskeyModal(nearestSpot || SPOTS[0])}
+              style={({ pressed }) => [
+                styles.passkeyRowCard,
+                pressed && styles.passkeyRowCardPressed,
+              ]}>
+              <View style={styles.passkeyRowLeft}>
+                <View style={styles.passkeyKeyIconWrap}>
+                  <Text style={styles.passkeyKeyIcon}>🔑</Text>
+                </View>
+                <View style={styles.passkeyTextCol}>
+                  <View style={styles.passkeyTitleRow}>
+                    <Text style={styles.passkeyRowTitle}>
+                      {language === 'lt' ? 'Neturite NFC? Įvesti kodą' : 'No NFC? Enter plaque passkey'}
+                    </Text>
+                    <View style={styles.passkeyRangePill}>
+                      <Text style={styles.passkeyRangePillText}>
+                        {language === 'lt' ? '≤ 10 m' : '≤ 10m'}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={styles.passkeyRowSubtitle}>
+                    {language === 'lt'
+                      ? 'Iškaltas fizinėje lentelėje prie objekto'
+                      : 'Engraved on the physical monument plaque'}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.passkeyChevronWrap}>
+                <Text style={styles.passkeyChevronText}>›</Text>
+              </View>
+            </Pressable>
+          </View>
         </View>
 
         {/* City Filter Pills */}
@@ -562,6 +733,159 @@ export default function HomeScreen() {
         </View>
       </ScrollView>
 
+      {/* Plaque Passkey Input Modal (Fallback when NFC fails or device lacks NFC, 10m proximity gated) */}
+      <Modal
+        visible={isPasskeyModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsPasskeyModalVisible(false)}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalOverlay}>
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => setIsPasskeyModalVisible(false)}
+          />
+          <View style={styles.passkeyModalContent}>
+            {/* Header */}
+            <View style={styles.passkeyHeaderRow}>
+              <View style={styles.passkeyIconBox}>
+                <Text style={styles.passkeyIcon}>🔑</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.passkeyModalTitle}>
+                  {language === 'lt' ? 'Lentelės kodas' : 'Plaque Passkey'}
+                </Text>
+                <Text style={styles.passkeyModalSubtitle}>
+                  {language === 'lt'
+                    ? 'Patvirtinimas be NFC (reikalinga ≤ 10 m)'
+                    : 'Physical Plaque Passkey (≤ 10m range)'}
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => setIsPasskeyModalVisible(false)}
+                style={styles.passkeyCloseBtn}>
+                <Text style={styles.passkeyCloseText}>✕</Text>
+              </Pressable>
+            </View>
+
+            {/* Target Spot & Proximity Badge */}
+            {passkeyTargetSpot && (() => {
+              const currentDistKm = calculateDistanceKm(
+                locationState.latitude,
+                locationState.longitude,
+                passkeyTargetSpot.latitude,
+                passkeyTargetSpot.longitude
+              );
+              const currentDistM = Math.round(currentDistKm * 1000);
+              const isInRange = currentDistM <= 10;
+
+              return (
+                <View style={styles.passkeyTargetCard}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.passkeySpotTitle} numberOfLines={1}>
+                      📍 {resolveText(passkeyTargetSpot.title, language)}
+                    </Text>
+                    <Text style={styles.passkeySpotCity}>
+                      {resolveText(
+                        CITIES.find((c) => c.id === passkeyTargetSpot.cityID)?.name || passkeyTargetSpot.teaser,
+                        language
+                      )}
+                    </Text>
+                  </View>
+
+                  <View
+                    style={[
+                      styles.proximityBadge,
+                      isInRange ? styles.proximityBadgeInRange : styles.proximityBadgeOutOfRange,
+                    ]}>
+                    <View
+                      style={[
+                        styles.proximityDot,
+                        isInRange ? styles.proximityDotInRange : styles.proximityDotOutOfRange,
+                      ]}
+                    />
+                    <Text
+                      style={[
+                        styles.proximityText,
+                        isInRange ? styles.proximityTextInRange : styles.proximityTextOutOfRange,
+                      ]}>
+                      {isInRange
+                        ? (language === 'lt' ? `✅ Vietoje: ${currentDistM} m (≤ 10 m)` : `✅ In range: ${currentDistM}m (≤ 10m)`)
+                        : (language === 'lt'
+                            ? `🔴 Už zonos ribų: ${currentDistM >= 1000 ? currentDistKm.toFixed(1) + ' km' : currentDistM + ' m'} (reikia ≤ 10 m)`
+                            : `🔴 Too far: ${currentDistM >= 1000 ? currentDistKm.toFixed(1) + ' km' : currentDistM + ' m'} (must be ≤ 10m)`)}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })()}
+
+            <Text style={styles.passkeyInstruction}>
+              {language === 'lt'
+                ? 'Įveskite raides ir skaičius, iškaltus fizinėje paveldo lentelėje prie objekto (pvz., VILKAS-1323). Kodas bus patvirtintas TIK esant 10 metrų atstumu nuo objekto.'
+                : 'Enter the letters and numbers engraved on the physical heritage plaque at this spot (e.g., VILKAS-1323). The passkey is ONLY validated if you are within 10 meters.'}
+            </Text>
+
+            {/* Input Field */}
+            <View style={styles.passkeyInputWrapper}>
+              <TextInput
+                style={styles.passkeyTextInput}
+                value={passkeyInput}
+                onChangeText={(text) => {
+                  setPasskeyInput(text);
+                  setPasskeyError(null);
+                }}
+                placeholder={language === 'lt' ? 'Pvz., VILKAS-1323' : 'e.g., VILKAS-1323'}
+                placeholderTextColor="#9ca3af"
+                autoCapitalize="characters"
+                autoCorrect={false}
+                returnKeyType="done"
+                onSubmitEditing={handleVerifyPasskey}
+              />
+            </View>
+
+            {/* Plaque Helper Tip */}
+            <View style={styles.passkeyTipBox}>
+              <Text style={styles.passkeyTipText}>
+                {language === 'lt'
+                  ? '💡 Kodas yra iškaltas tiesiai po NFC simboliu fizinėje lentelėje.'
+                  : '💡 The passkey is stamped directly below the NFC logo on the plaque.'}
+              </Text>
+            </View>
+
+            {/* Error Message */}
+            {passkeyError && (
+              <View style={styles.passkeyErrorContainer}>
+                <Text style={styles.passkeyErrorText}>{passkeyError}</Text>
+              </View>
+            )}
+
+            {/* Action Buttons */}
+            <View style={styles.passkeyModalActionRow}>
+              <Pressable
+                onPress={() => setIsPasskeyModalVisible(false)}
+                style={styles.passkeyCancelBtn}>
+                <Text style={styles.passkeyCancelText}>
+                  {language === 'lt' ? 'Atšaukti' : 'Cancel'}
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={handleVerifyPasskey}
+                style={({ pressed }) => [
+                  styles.passkeyVerifyBtn,
+                  pressed && styles.passkeyVerifyBtnPressed,
+                ]}>
+                <Text style={styles.passkeyVerifyText}>
+                  🔓 {language === 'lt' ? 'Atrakinti vietą' : 'Unlock Spot'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
       {/* Story & Lore Modal */}
       <SpotStoryModal
         spot={activeSpot}
@@ -575,22 +899,23 @@ export default function HomeScreen() {
         onClose={() => setActiveSpot(null)}
         onUnlockedChange={handleUnlockedChange}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  rootContainer: {
     flex: 1,
     backgroundColor: WiseColors.canvasSoft,
   },
   container: {
-    padding: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.sm,
     gap: Spacing.xl,
     maxWidth: 760,
     alignSelf: 'center',
     width: '100%',
-    paddingBottom: Spacing.huge,
+    paddingBottom: 40,
   },
   topBar: {
     flexDirection: 'row',
@@ -756,7 +1081,9 @@ const styles = StyleSheet.create({
   scannerCard: {
     backgroundColor: WiseColors.canvas,
     borderRadius: Rounded.xxl,
-    padding: Spacing.xl,
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.xl,
+    paddingBottom: Spacing.xxl,
     borderWidth: 1,
     borderColor: '#dcdfd9',
     alignItems: 'center',
@@ -819,14 +1146,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     width: '100%',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
+    paddingVertical: 13,
+    paddingHorizontal: 16,
     borderRadius: Rounded.pill,
     shadowColor: WiseColors.primary,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.28,
+    shadowRadius: 10,
+    elevation: 4,
   },
   wisePillButtonPressed: {
     backgroundColor: WiseColors.primaryActive,
@@ -835,19 +1162,29 @@ const styles = StyleSheet.create({
   wisePillButtonScanning: {
     backgroundColor: WiseColors.primaryHover,
   },
+  nfcBtnTextGroup: {
+    flex: 1,
+  },
   wisePillButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '900',
     letterSpacing: -0.3,
   },
+  wisePillButtonSubtext: {
+    color: 'rgba(255, 255, 255, 0.78)',
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 1,
+  },
   arrowCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
+    marginLeft: 8,
   },
   arrowCircleText: {
     color: '#FFFFFF',
@@ -1097,6 +1434,330 @@ const styles = StyleSheet.create({
   },
   detailsActionBtnText: {
     fontSize: 12,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  scannerActionsContainer: {
+    width: '100%',
+    gap: 8,
+    marginTop: 4,
+  },
+  nfcBtnContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  nfcIconBubble: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  nfcIconSymbol: {
+    fontSize: 16,
+  },
+  actionDividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    paddingVertical: 2,
+    gap: 12,
+  },
+  actionDividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E2E7E4',
+  },
+  actionDividerText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#94A399',
+    letterSpacing: 1,
+  },
+  passkeyRowCard: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F6F9F7',
+    borderWidth: 1.5,
+    borderColor: '#D7E5DC',
+    borderRadius: Rounded.xl,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  passkeyRowCardPressed: {
+    backgroundColor: '#EBF2EE',
+    borderColor: WiseColors.primary,
+    transform: [{ scale: 0.99 }],
+  },
+  passkeyRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  passkeyKeyIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#E5F0E9',
+    borderWidth: 1,
+    borderColor: '#CEE0D4',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  passkeyKeyIcon: {
+    fontSize: 16,
+  },
+  passkeyTextCol: {
+    flex: 1,
+    gap: 2,
+  },
+  passkeyTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  passkeyRowTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: WiseColors.ink,
+    letterSpacing: -0.2,
+  },
+  passkeyRowSubtitle: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: WiseColors.body,
+    lineHeight: 15,
+  },
+  passkeyRangePill: {
+    backgroundColor: '#D7EDE0',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: Rounded.pill,
+  },
+  passkeyRangePillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: WiseColors.forestGreen,
+    letterSpacing: 0.2,
+  },
+  passkeyChevronWrap: {
+    marginLeft: 6,
+    paddingHorizontal: 4,
+  },
+  passkeyChevronText: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#8A9C90',
+    lineHeight: 24,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    padding: Spacing.lg,
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFill,
+  },
+  passkeyModalContent: {
+    width: '100%',
+    maxWidth: 440,
+    backgroundColor: WiseColors.canvas,
+    borderRadius: Rounded.xl,
+    padding: Spacing.xl,
+    gap: Spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  passkeyHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  passkeyIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: Rounded.md,
+    backgroundColor: WiseColors.primaryPale,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  passkeyIcon: {
+    fontSize: 22,
+  },
+  passkeyModalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: WiseColors.ink,
+  },
+  passkeyModalSubtitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: WiseColors.body,
+  },
+  passkeyCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: WiseColors.canvasSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  passkeyCloseText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: WiseColors.ink,
+  },
+  passkeyTargetCard: {
+    backgroundColor: WiseColors.canvasSoft,
+    borderRadius: Rounded.lg,
+    padding: Spacing.md,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  passkeySpotTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: WiseColors.ink,
+  },
+  passkeySpotCity: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: WiseColors.body,
+  },
+  proximityBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: Rounded.pill,
+  },
+  proximityBadgeInRange: {
+    backgroundColor: '#dcfce7',
+    borderWidth: 1,
+    borderColor: '#86efac',
+  },
+  proximityBadgeOutOfRange: {
+    backgroundColor: '#fee2e2',
+    borderWidth: 1,
+    borderColor: '#fca5a5',
+  },
+  proximityDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+  },
+  proximityDotInRange: {
+    backgroundColor: '#16a34a',
+  },
+  proximityDotOutOfRange: {
+    backgroundColor: '#dc2626',
+  },
+  proximityText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  proximityTextInRange: {
+    color: '#15803d',
+  },
+  proximityTextOutOfRange: {
+    color: '#b91c1c',
+  },
+  passkeyInstruction: {
+    fontSize: 13,
+    color: WiseColors.body,
+    lineHeight: 18,
+  },
+  passkeyInputWrapper: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: Rounded.md,
+    borderWidth: 2,
+    borderColor: WiseColors.primary,
+    paddingHorizontal: 14,
+    paddingVertical: Platform.OS === 'ios' ? 12 : 8,
+  },
+  passkeyTextInput: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: WiseColors.ink,
+    letterSpacing: 1.5,
+  },
+  passkeyTipBox: {
+    backgroundColor: '#F3F6F4',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: Rounded.md,
+    borderWidth: 1,
+    borderColor: '#E0E7E2',
+  },
+  passkeyTipText: {
+    fontSize: 12,
+    color: WiseColors.body,
+    fontWeight: '500',
+    lineHeight: 16,
+  },
+  passkeyErrorContainer: {
+    backgroundColor: '#fee2e2',
+    borderRadius: Rounded.sm,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#fca5a5',
+  },
+  passkeyErrorText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#b91c1c',
+    lineHeight: 16,
+  },
+  passkeyModalActionRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 4,
+  },
+  passkeyCancelBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: Rounded.pill,
+    backgroundColor: WiseColors.canvasSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  passkeyCancelText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: WiseColors.ink,
+  },
+  passkeyVerifyBtn: {
+    flex: 1.5,
+    paddingVertical: 12,
+    borderRadius: Rounded.pill,
+    backgroundColor: WiseColors.forestGreen,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  passkeyVerifyBtnPressed: {
+    opacity: 0.85,
+  },
+  passkeyVerifyText: {
+    fontSize: 14,
     fontWeight: '800',
     color: '#FFFFFF',
   },

@@ -50,6 +50,53 @@ export function GoogleLogo({ size = 20, style }: { size?: number; style?: StyleP
 }
 
 /**
+ * Instant Official Google Android Robot Logo Vector (Official Bugdroid Head, 0ms load time)
+ */
+export function AndroidLogo({ size = 20, color = '#3DDC84', style }: IconProps) {
+  const width = size;
+  const height = size * (515.1 / 918.6);
+  return (
+    <View style={[{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }, style]}>
+      <Svg width={width} height={height} viewBox="0 0 918.6 515.1">
+        <Path
+          d="M918.6 515.1h-918.6c14.7-155.7 103.7-288.7 235.1-359.9l-76.2-132c-4.3-7.4-1.8-16.8 5.6-21.1s16.8-1.8 21.1 5.6l77.2 133.7c58.9-26.9 125.2-41.9 196.5-41.9s137.6 15 196.5 41.9l77.2-133.7c4.2-7.4 13.7-9.9 21-5.6s9.9 13.7 5.6 21.1l-76.2 132c131.5 71.2 220.5 204.2 235.2 359.9zm-248.5-129c21.3 0 38.6-17.3 38.5-38.5 0-21.2-17.2-38.5-38.5-38.5-21.2 0-38.5 17.2-38.5 38.5 0 21.2 17.2 38.5 38.5 38.5zm-421.7 0c21.3 0 38.6-17.3 38.5-38.5 0-21.2-17.2-38.5-38.5-38.5-21.2 0-38.5 17.2-38.5 38.5 0 21.2 17.2 38.5 38.5 38.5z"
+          fill={color}
+        />
+      </Svg>
+    </View>
+  );
+}
+
+/**
+ * Instant Official Google Play Multi-Colored Brand Logo Vector (0ms load time)
+ */
+export function GooglePlayLogo({ size = 20, style }: { size?: number; style?: StyleProp<ViewStyle> }) {
+  const width = size * (28.99 / 31.99);
+  return (
+    <View style={[{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }, style]}>
+      <Svg width={width} height={size} viewBox="0 0 28.99 31.99">
+        <Path
+          d="M13.54 15.28.12 29.34a3.66 3.66 0 0 0 5.33 2.16l15.1-8.6Z"
+          fill="#EA4335"
+        />
+        <Path
+          d="m27.11 12.89-6.53-3.74-7.35 6.45 7.38 7.28 6.48-3.7a3.54 3.54 0 0 0 1.5-4.79 3.62 3.62 0 0 0-1.5-1.5z"
+          fill="#FBBC04"
+        />
+        <Path
+          d="M.12 2.66a3.57 3.57 0 0 0-.12.92v24.84a3.57 3.57 0 0 0 .12.92L14 15.64Z"
+          fill="#4285F4"
+        />
+        <Path
+          d="m13.64 16 6.94-6.85L5.5.51A3.73 3.73 0 0 0 3.63 0 3.64 3.64 0 0 0 .12 2.65Z"
+          fill="#34A853"
+        />
+      </Svg>
+    </View>
+  );
+}
+
+/**
  * Clean Mail / Envelope Vector Icon (0ms load time)
  */
 export function MailIcon({ size = 18, color = '#687076', style }: IconProps) {
@@ -161,3 +208,51 @@ export function ArrowLeftIcon({ size = 20, color = '#11181C', style }: IconProps
     </View>
   );
 }
+
+/**
+ * Clean Clock / Duration Vector Icon (0ms load time)
+ */
+export function ClockIcon({ size = 18, color = '#687076', style }: IconProps) {
+  return (
+    <View style={[{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }, style]}>
+      <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+        <Circle cx="12" cy="12" r="9" stroke={color} strokeWidth="2" />
+        <Path d="M12 7v5l3 3" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </Svg>
+    </View>
+  );
+}
+
+/**
+ * Clean Cloud Backup / Sync Vector Icon (0ms load time)
+ */
+export function CloudIcon({ size = 18, color = '#687076', style }: IconProps) {
+  return (
+    <View style={[{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }, style]}>
+      <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+        <Path
+          d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"
+          stroke={color}
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </Svg>
+    </View>
+  );
+}
+
+/**
+ * Clean Search / Magnifier Vector Icon (0ms load time)
+ */
+export function SearchIcon({ size = 18, color = '#687076', style }: IconProps) {
+  return (
+    <View style={[{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }, style]}>
+      <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+        <Circle cx="11" cy="11" r="7" stroke={color} strokeWidth="2" />
+        <Path d="m20 20-3.5-3.5" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      </Svg>
+    </View>
+  );
+}
+

@@ -26,6 +26,9 @@ export default function RootLayout() {
           require('../../assets/images/uzupis.jpg'),
           require('../../assets/images/trakai_castle.jpg'),
           require('../../assets/images/hill_of_crosses.jpg'),
+          require('../../assets/images/st_anne_church.jpg'),
+          require('../../assets/images/three_crosses.jpg'),
+          require('../../assets/images/grand_dukes_palace.jpg'),
         ]);
       } catch (e) {
         // Continue even if prefetch is interrupted
