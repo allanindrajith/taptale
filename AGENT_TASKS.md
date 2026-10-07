@@ -12,7 +12,7 @@ Shared board for Claude Code and Antigravity agents working in this repo.
 
 | # | Section | Owner | Status | Files it touches |
 |---|---------|-------|--------|------------------|
-| 1 | Unlocked places first (Explore) | Claude Code | in progress | `src/app/index.tsx`, new `src/components/your-places.tsx` |
+| 1 | Unlocked places first (Explore) | Claude Code | done | `src/app/index.tsx`, new `src/components/your-places.tsx` |
 | 2 | Readability + real photos | Claude Code | in progress | `src/constants/theme.ts`, `src/components/ui/kit.tsx`, `src/components/spot-story-modal.tsx`, `src/components/story-player.tsx`, `src/components/passkey-sheet.tsx`, `src/components/app-tabs.tsx`, `src/constants/spots.ts` (only `imageUrl` lines), `src/app/_layout.tsx` (only image preload), `assets/images/spots/*`, new `src/constants/photo-credits.ts`, new `src/components/photo-credits.tsx`, new `PHOTO_CREDITS.md` |
 | 3 | Passport: editable profile | Claude Code | in progress | `src/app/me.tsx`, `src/services/user-storage.ts`, `app.json` (only permission strings), new `src/components/profile-editor.tsx` |
 | 4 | Help audit | Claude Code | in progress | `src/app/help.tsx` |

@@ -17,8 +17,9 @@ import { useLocalSearchParams } from 'expo-router';
 import { LocationAnimation } from '@/components/location-animation';
 import { PasskeySheet } from '@/components/passkey-sheet';
 import { SpotStoryModal } from '@/components/spot-story-modal';
+import { getUnlockedPlaces, YourPlaces } from '@/components/your-places';
 import { Chip, ChipRow, EmptyState, Segmented, SpotRow, tr } from '@/components/ui/kit';
-import { calculateDistanceKm, CITIES, resolveText, Spot, SPOTS } from '@/constants/spots';
+import { AppLanguage, calculateDistanceKm, CITIES, resolveText, Spot, SPOTS } from '@/constants/spots';
 import { Palette, Type } from '@/constants/theme';
 import { useLanguage } from '@/hooks/use-language';
 import { unlockedMessage, useNfcUnlock } from '@/hooks/use-nfc-unlock';
@@ -29,6 +30,15 @@ import { UnlockService } from '@/services/unlock-storage';
 interface SpotWithDistance {
   spot: Spot;
   km: number;
+}
+
+/** Case-insensitive match on title or teaser; an empty query matches everything. */
+function matchesQuery(spot: Spot, q: string, language: AppLanguage): boolean {
+  if (!q) return true;
+  return (
+    resolveText(spot.title, language).toLowerCase().includes(q) ||
+    resolveText(spot.teaser, language).toLowerCase().includes(q)
+  );
 }
 
 export default function ExploreScreen() {
@@ -53,16 +63,21 @@ export default function ExploreScreen() {
     [location.latitude, location.longitude]
   );
 
-  const spots = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return byDistance.filter(
-      ({ spot }) =>
-        (city === 'all' || spot.cityID === city) &&
-        (!q ||
-          resolveText(spot.title, language).toLowerCase().includes(q) ||
-          resolveText(spot.teaser, language).toLowerCase().includes(q))
-    );
-  }, [byDistance, query, city, language]);
+  const q = query.trim().toLowerCase();
+
+  // Unlocked places become one-tap shortcuts; `version` re-reads them after any unlock/renew/reset.
+  const unlockedPlaces = getUnlockedPlaces(version);
+  const unlockedIds = new Set(unlockedPlaces.map((p) => p.spot.id));
+  // Search narrows the shortcuts too (so a searched-for unlocked place is never "not found");
+  // city chips only filter the locked list below.
+  const shortcuts = unlockedPlaces.filter((p) => matchesQuery(p.spot, q, language));
+
+  // The list below holds only places still to unlock.
+  const lockedSpots = byDistance.filter(({ spot }) => !unlockedIds.has(spot.id));
+  const spots = lockedSpots.filter(
+    ({ spot }) => (city === 'all' || spot.cityID === city) && matchesQuery(spot, q, language)
+  );
+  const showYourPlaces = shortcuts.length > 0 || (!q && unlockedPlaces.length === 0);
 
   const nearest = byDistance[0]?.spot;
 
@@ -190,13 +205,17 @@ export default function ExploreScreen() {
           disabled={scanning}
           onPress={() => scan()}
           style={({ pressed }) => [styles.scanBtn, pressed && styles.pressed, scanning && styles.dim]}>
-          <Ionicons name="phone-portrait-outline" size={18} color={Palette.greenDeep} />
+          <Ionicons name="phone-portrait-outline" size={20} color={Palette.greenDeep} />
           <Text style={styles.scanBtnText}>
             {scanning ? tr(language, 'Scanning…', 'Skenuojama…') : tr(language, 'Scan plaque', 'Skenuoti lentelę')}
           </Text>
         </Pressable>
 
-        <Pressable accessibilityRole="button" onPress={() => openPasskey()} hitSlop={8} style={styles.codeLink}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={tr(language, 'No NFC? Enter the code', 'Nėra NFC? Įveskite kodą')}
+          onPress={() => openPasskey()}
+          style={({ pressed }) => [styles.codeLink, pressed && styles.dim]}>
           <Text style={styles.codeLinkText}>{tr(language, 'No NFC? Enter the code', 'Nėra NFC? Įveskite kodą')}</Text>
         </Pressable>
 
@@ -210,8 +229,20 @@ export default function ExploreScreen() {
         </View>
       </View>
 
+      {showYourPlaces ? (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle} accessibilityRole="header">
+              {tr(language, 'Your places', 'Jūsų vietos')}
+            </Text>
+            {shortcuts.length > 0 ? <Text style={styles.sectionCount}>{shortcuts.length}</Text> : null}
+          </View>
+          <YourPlaces places={shortcuts} language={language} onOpen={setActiveSpot} />
+        </View>
+      ) : null}
+
       <View style={styles.search}>
-        <Ionicons name="search" size={18} color={Palette.mute} />
+        <Ionicons name="search" size={20} color={Palette.mute} />
         <TextInput
           value={query}
           onChangeText={setQuery}
@@ -236,6 +267,13 @@ export default function ExploreScreen() {
           />
         ))}
       </ChipRow>
+
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle} accessibilityRole="header">
+          {tr(language, 'Places to discover', 'Vietos atrasti')}
+        </Text>
+        <Text style={styles.sectionCount}>{spots.length}</Text>
+      </View>
     </View>
   );
 
@@ -256,17 +294,28 @@ export default function ExploreScreen() {
             spot={item.spot}
             language={language}
             distanceKm={item.km}
-            unlocked={UnlockService.isUnlocked(item.spot.id)}
-            daysLeft={UnlockService.getDaysRemaining(item.spot.id)}
+            unlocked={false}
             onPress={() => setActiveSpot(item.spot)}
           />
         )}
         ListEmptyComponent={
-          <EmptyState
-            icon="search-outline"
-            title={tr(language, 'No places found', 'Vietų nerasta')}
-            body={tr(language, 'Try another name or city.', 'Pabandykite kitą pavadinimą ar miestą.')}
-          />
+          lockedSpots.length === 0 ? (
+            <EmptyState
+              icon="trophy-outline"
+              title={tr(language, 'Every place unlocked', 'Atrakintos visos vietos')}
+              body={tr(
+                language,
+                'You’ve collected every story. Find them under Your places.',
+                'Surinkote visas istorijas. Jas rasite skiltyje „Jūsų vietos“.'
+              )}
+            />
+          ) : (
+            <EmptyState
+              icon="search-outline"
+              title={tr(language, 'No places found', 'Vietų nerasta')}
+              body={tr(language, 'Try another name or city.', 'Pabandykite kitą pavadinimą ar miestą.')}
+            />
+          )
         }
       />
 
@@ -293,12 +342,12 @@ const styles = StyleSheet.create({
     maxWidth: 680,
     alignSelf: 'center',
   },
-  headerStack: { gap: 20, marginBottom: 8 },
+  headerStack: { gap: 20, marginBottom: 10 },
   flex: { flex: 1 },
   topBar: { flexDirection: 'row', alignItems: 'flex-end', gap: 12 },
   placeRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 },
-  placeText: { fontSize: 13, fontWeight: '600', color: Palette.green },
-  langToggle: { width: 96, marginBottom: 4 },
+  placeText: { fontSize: 15, fontWeight: '600', color: Palette.green },
+  langToggle: { width: 104, marginBottom: 4 },
 
   tapCard: {
     backgroundColor: Palette.green,
@@ -308,10 +357,12 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   tapTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  tapTitle: { fontSize: 24, fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.5 },
-  tapBody: { fontSize: 15, lineHeight: 21, color: 'rgba(255,255,255,0.82)', marginTop: 4 },
+  tapTitle: { fontSize: 26, fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.5 },
+  tapBody: { fontSize: 17, lineHeight: 24, color: 'rgba(255,255,255,0.88)', marginTop: 4 },
   scanBtn: {
-    height: 54,
+    minHeight: 56,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     borderRadius: 16,
     backgroundColor: '#FFFFFF',
     flexDirection: 'row',
@@ -319,10 +370,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
-  scanBtnText: { fontSize: 16, fontWeight: '700', color: Palette.greenDeep },
-  codeLink: { alignSelf: 'center', paddingVertical: 2 },
+  scanBtnText: { fontSize: 17, fontWeight: '700', color: Palette.greenDeep },
+  codeLink: {
+    alignSelf: 'center',
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    marginVertical: -6,
+  },
   codeLinkText: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
     color: 'rgba(255,255,255,0.9)',
     textDecorationLine: 'underline',
@@ -336,20 +393,26 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   progressFill: { height: '100%', borderRadius: 3, backgroundColor: Palette.goldTint },
-  progressText: { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.9)' },
+  progressText: { fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.92)' },
+
+  section: { gap: 12 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 },
+  sectionTitle: { flexShrink: 1, fontSize: 20, fontWeight: '700', letterSpacing: -0.3, color: Palette.ink },
+  sectionCount: { fontSize: 15, fontWeight: '600', color: Palette.mute },
 
   search: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    height: 48,
-    paddingHorizontal: 14,
-    borderRadius: 14,
+    minHeight: 52,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 16,
     backgroundColor: Palette.surface,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: Palette.hairline,
   },
-  searchInput: { flex: 1, fontSize: 16, color: Palette.ink, paddingVertical: 0 },
+  searchInput: { flex: 1, fontSize: 17, color: Palette.ink, paddingVertical: 0 },
 
   pressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
   dim: { opacity: 0.7 },
