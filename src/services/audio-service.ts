@@ -180,8 +180,14 @@ export const AudioService = {
     spotId: string,
     onProgress?: (percent: number) => void,
     onDone?: () => void
-  ) {
+  ): Promise<boolean> {
     this.stop();
+
+    // The synthesizer needs the Web Audio API, which only exists in browsers.
+    // On iOS/Android there is nothing to play here — bundled tracks are played by useStoryAudio.
+    const ctx = getWebAudioContext();
+    if (!ctx) return false;
+
     await this.init();
 
     this.activeMode = 'music';
@@ -200,21 +206,8 @@ export const AudioService = {
     }
 
     // High fidelity audio synthesizer for Web & React Native Web
-    const ctx = getWebAudioContext();
-    if (ctx) {
-      this.playSynthesizedAtmosphere(ctx, spotId);
-      return;
-    }
-
-    // Native fallback on iOS/Android: Play sound frequency bell/tone chords
-    try {
-      // In native, if sound file is not bundled yet, Speech ambient drone intro provides feedback
-      speakText('Atmospheric heritage audio playing', {
-        language: 'en-US',
-        pitch: 0.8,
-        rate: 1.1,
-      });
-    } catch (e) {}
+    this.playSynthesizedAtmosphere(ctx, spotId);
+    return true;
   },
 
   /**

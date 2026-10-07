@@ -1,10 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { AppLanguage, resolveText, Spot } from '@/constants/spots';
 import { Palette, Touch } from '@/constants/theme';
-import { AudioMode, AudioService } from '@/services/audio-service';
+import { useStoryAudio } from '@/hooks/use-story-audio';
 import { IconButton, Segmented, tr } from '@/components/ui/kit';
 
 interface Props {
@@ -20,104 +20,48 @@ export function StoryPlayer({ spot, language }: Props) {
   const chapters = useMemo(() => spot.story ?? [], [spot.story]);
   const lastIndex = Math.max(0, chapters.length - 1);
 
-  const [chapter, setChapter] = useState(0);
-  const [mode, setMode] = useState<AudioMode>('voice');
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [progress, setProgress] = useState(0);
   const [isLoreOpen, setIsLoreOpen] = useState(false);
-  const isMounted = useRef(true);
-  // Lets a finished chapter start the next one without narrate() referencing itself
-  const narrateRef = useRef<(index: number) => void>(() => {});
-
-  useEffect(() => {
-    isMounted.current = true;
-    return () => {
-      isMounted.current = false;
-      AudioService.stop();
-    };
-  }, []);
-
-  const stop = useCallback(() => {
-    AudioService.stop();
-    setIsPlaying(false);
-    setProgress(0);
-  }, []);
-
-  const narrate = useCallback(
-    (index: number) => {
-      setChapter(index);
-      setIsPlaying(true);
-      setProgress(0);
-      AudioService.playNarrator(
-        resolveText(chapters[index], language),
-        language,
-        (pct) => isMounted.current && setProgress(pct),
-        () => {
-          if (!isMounted.current) return;
-          if (index < lastIndex) narrateRef.current(index + 1);
-          else setIsPlaying(false);
-        }
-      );
-    },
-    [chapters, language, lastIndex]
-  );
-
-  useEffect(() => {
-    narrateRef.current = narrate;
-  }, [narrate]);
-
-  const togglePlay = () => {
-    if (isPlaying) return stop();
-    if (mode === 'voice') return narrate(chapter);
-    setIsPlaying(true);
-    AudioService.playMusic(spot.id, (pct) => isMounted.current && setProgress(pct));
-  };
-
-  const goTo = (index: number) => {
-    if (isPlaying && mode === 'voice') narrate(index);
-    else setChapter(index);
-  };
-
-  const switchMode = (next: AudioMode) => {
-    stop();
-    setMode(next);
-  };
+  const { mode, chapter, isPlaying, isLoading, progress, canPlayMusic, sourceLabel, togglePlay, goTo, switchMode } =
+    useStoryAudio({ spotId: spot.id, language, chapters });
 
   const lore = spot.secretLore ?? [];
-  const trackName =
-    mode === 'voice'
-      ? resolveText(spot.audioGuide.narrator, language)
-      : resolveText(spot.audioGuide.musicTrack, language);
 
   return (
     <View style={styles.wrap}>
       {/* Player */}
       <View style={styles.player}>
-        <Segmented
-          value={mode}
-          onChange={switchMode}
-          options={[
-            { value: 'voice', label: tr(language, 'Story', 'Istorija'), icon: 'mic-outline' },
-            { value: 'music', label: tr(language, 'Music', 'Muzika'), icon: 'musical-notes-outline' },
-          ]}
-        />
+        {canPlayMusic ? (
+          <Segmented
+            value={mode}
+            onChange={switchMode}
+            options={[
+              { value: 'voice', label: tr(language, 'Story', 'Istorija'), icon: 'mic-outline' },
+              { value: 'music', label: tr(language, 'Music', 'Muzika'), icon: 'musical-notes-outline' },
+            ]}
+          />
+        ) : null}
         <View style={styles.playerRow}>
           <Pressable
             testID="play-button"
             accessibilityRole="button"
             accessibilityLabel={isPlaying ? tr(language, 'Pause', 'Pauzė') : tr(language, 'Play', 'Groti')}
+            accessibilityState={{ busy: isLoading }}
             onPress={togglePlay}
             style={({ pressed }) => [styles.playBtn, pressed && styles.pressed]}>
-            <Ionicons name={isPlaying ? 'pause' : 'play'} size={30} color="#FFFFFF" style={!isPlaying && styles.playNudge} />
+            {isLoading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Ionicons name={isPlaying ? 'pause' : 'play'} size={30} color="#FFFFFF" style={!isPlaying && styles.playNudge} />
+            )}
           </Pressable>
           <View style={styles.flex}>
             <Text style={styles.trackTitle} numberOfLines={2}>
               {mode === 'voice'
                 ? tr(language, `Chapter ${chapter + 1}`, `${chapter + 1} skyrius`)
-                : tr(language, 'Ambient music', 'Aplinkos muzika')}
+                : tr(language, 'Music for this place', 'Šios vietos muzika')}
             </Text>
             <Text style={styles.trackSub} numberOfLines={2}>
-              {trackName}
+              {sourceLabel}
             </Text>
             <View style={styles.track}>
               <View style={[styles.trackFill, { width: `${progress}%` }]} />
