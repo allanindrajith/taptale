@@ -76,8 +76,8 @@ export function PasskeySheet({ visible, spot, language, userCoords, onClose, onU
     <Sheet visible={visible} onClose={close} title={tr(language, 'Enter plaque code', 'Įveskite lentelės kodą')}>
       {spot ? (
         <View style={styles.target}>
-          <Ionicons name="location-outline" size={18} color={Palette.inkSoft} />
-          <Text style={styles.targetName} numberOfLines={1}>
+          <Ionicons name="location-outline" size={22} color={Palette.inkSoft} />
+          <Text style={styles.targetName} numberOfLines={2}>
             {resolveText(spot.title, language)}
           </Text>
           <Text style={[styles.range, { color: inRange ? Palette.green : Palette.mute }]}>
@@ -118,7 +118,8 @@ const styles = StyleSheet.create({
   target: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
+    minHeight: 52,
     backgroundColor: Palette.surface,
     borderRadius: 14,
     paddingHorizontal: 14,
@@ -126,20 +127,21 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: Palette.hairline,
   },
-  targetName: { flex: 1, fontSize: 15, fontWeight: '600', color: Palette.ink },
-  range: { fontSize: 13, fontWeight: '600' },
+  targetName: { flex: 1, fontSize: 17, lineHeight: 22, fontWeight: '600', color: Palette.ink },
+  range: { fontSize: 15, fontWeight: '600' },
   input: {
-    height: 58,
+    minHeight: 62,
+    paddingVertical: 12,
     borderRadius: 16,
     borderWidth: 1.5,
     borderColor: Palette.hairline,
     backgroundColor: Palette.surface,
     paddingHorizontal: 18,
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
     letterSpacing: 2,
     color: Palette.ink,
     textAlign: 'center',
   },
-  error: { fontSize: 13, color: Palette.danger, lineHeight: 18 },
+  error: { fontSize: 15, color: Palette.danger, lineHeight: 21 },
 });

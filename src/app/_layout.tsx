@@ -19,16 +19,12 @@ export default function RootLayout() {
       try {
         // Preload spot images directly into memory cache for instant rendering
         await Asset.loadAsync([
-          require('../../assets/images/gediminas_tower.jpg'),
-          require('../../assets/images/cathedral_square.jpg'),
-          require('../../assets/images/gate_of_dawn.jpg'),
-          require('../../assets/images/vilnius_university.jpg'),
-          require('../../assets/images/uzupis.jpg'),
-          require('../../assets/images/trakai_castle.jpg'),
-          require('../../assets/images/hill_of_crosses.jpg'),
-          require('../../assets/images/st_anne_church.jpg'),
-          require('../../assets/images/three_crosses.jpg'),
-          require('../../assets/images/grand_dukes_palace.jpg'),
+          require('../../assets/images/spots/vln-gediminas-tower.jpg'),
+          require('../../assets/images/spots/vln-cathedral-square.jpg'),
+          require('../../assets/images/spots/vln-gate-of-dawn.jpg'),
+          require('../../assets/images/spots/vln-university.jpg'),
+          require('../../assets/images/spots/trk-island-castle.jpg'),
+          require('../../assets/images/spots/sia-hill-of-crosses.jpg'),
         ]);
       } catch (e) {
         // Continue even if prefetch is interrupted

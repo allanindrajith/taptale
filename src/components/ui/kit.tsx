@@ -5,7 +5,6 @@
 import React from 'react';
 import {
   ActivityIndicator,
-  Image,
   ImageSourcePropType,
   KeyboardAvoidingView,
   Modal,
@@ -20,10 +19,11 @@ import {
   ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppLanguage, CITIES, resolveText, Spot } from '@/constants/spots';
-import { Palette, Type } from '@/constants/theme';
+import { Palette, TIGHT_FONT_SCALE, Touch, Type } from '@/constants/theme';
 
 export type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -186,7 +186,7 @@ export function Button({
       {loading ? (
         <ActivityIndicator color={fg} size="small" />
       ) : icon ? (
-        <Ionicons name={icon} size={18} color={fg} />
+        <Ionicons name={icon} size={20} color={fg} />
       ) : null}
       <Text style={[styles.btnText, { color: fg }]}>{label}</Text>
     </Pressable>
@@ -198,7 +198,7 @@ export function IconButton({
   onPress,
   label,
   tone = 'light',
-  size = 40,
+  size = 44,
 }: {
   icon: IconName;
   onPress: () => void;
@@ -210,7 +210,7 @@ export function IconButton({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
-      hitSlop={8}
+      hitSlop={Math.max(8, Math.ceil((Touch.min - size) / 2))}
       onPress={onPress}
       style={({ pressed }) => [
         styles.iconBtn,
@@ -218,7 +218,11 @@ export function IconButton({
         tone === 'glass' && styles.iconBtnGlass,
         pressed && styles.pressed,
       ]}>
-      <Ionicons name={icon} size={size * 0.5} color={tone === 'glass' ? '#FFFFFF' : Palette.ink} />
+      <Ionicons
+        name={icon}
+        size={Math.max(20, Math.round(size * 0.5))}
+        color={tone === 'glass' ? '#FFFFFF' : Palette.ink}
+      />
     </Pressable>
   );
 }
@@ -238,7 +242,11 @@ export function Chip({
       accessibilityState={{ selected: !!active }}
       onPress={onPress}
       style={({ pressed }) => [styles.chip, active && styles.chipActive, pressed && styles.pressed]}>
-      <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
+      <Text
+        style={[styles.chipText, active && styles.chipTextActive]}
+        maxFontSizeMultiplier={TIGHT_FONT_SCALE}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -277,9 +285,13 @@ export function Segmented<T extends string>({
             onPress={() => onChange(o.value)}
             style={[styles.segmentItem, active && styles.segmentItemActive]}>
             {o.icon ? (
-              <Ionicons name={o.icon} size={14} color={active ? Palette.ink : Palette.mute} />
+              <Ionicons name={o.icon} size={17} color={active ? Palette.ink : Palette.mute} />
             ) : null}
-            <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{o.label}</Text>
+            <Text
+              style={[styles.segmentText, active && styles.segmentTextActive]}
+              maxFontSizeMultiplier={TIGHT_FONT_SCALE}>
+              {o.label}
+            </Text>
           </Pressable>
         );
       })}
@@ -298,8 +310,10 @@ export function Pill({ label, icon, tone = 'neutral' }: { label: string; icon?: 
   }[tone];
   return (
     <View style={[styles.pill, { backgroundColor: map.bg }]}>
-      {icon ? <Ionicons name={icon} size={12} color={map.fg} /> : null}
-      <Text style={[styles.pillText, { color: map.fg }]}>{label}</Text>
+      {icon ? <Ionicons name={icon} size={14} color={map.fg} /> : null}
+      <Text style={[styles.pillText, { color: map.fg }]} maxFontSizeMultiplier={TIGHT_FONT_SCALE}>
+        {label}
+      </Text>
     </View>
   );
 }
@@ -330,24 +344,31 @@ export function SpotRow({ spot, language, distanceKm, unlocked, daysLeft, onPres
       accessibilityLabel={resolveText(spot.title, language)}
       onPress={onPress}
       style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
-      <Image source={spotImage(spot)} style={styles.rowThumb} resizeMode="cover" />
+      <Image
+        source={spotImage(spot)}
+        style={styles.rowThumb}
+        contentFit="cover"
+        transition={200}
+        cachePolicy="memory-disk"
+        accessibilityIgnoresInvertColors
+      />
       <View style={styles.rowBody}>
-        <Text style={styles.rowTitle} numberOfLines={1}>
+        <Text style={styles.rowTitle} numberOfLines={2}>
           {resolveText(spot.title, language)}
         </Text>
-        <Text style={Type.small} numberOfLines={1}>
+        <Text style={Type.small} numberOfLines={2}>
           {subtitle}
         </Text>
       </View>
       {unlocked ? (
         <View style={styles.rowState}>
-          <Ionicons name="checkmark-circle" size={20} color={Palette.green} />
+          <Ionicons name="checkmark-circle" size={26} color={Palette.green} />
           {daysLeft !== undefined ? (
             <Text style={styles.rowStateText}>{tr(language, `${daysLeft}d`, `${daysLeft} d.`)}</Text>
           ) : null}
         </View>
       ) : (
-        <Ionicons name="lock-closed-outline" size={18} color={Palette.mute} />
+        <Ionicons name="lock-closed-outline" size={22} color={Palette.mute} />
       )}
     </Pressable>
   );
@@ -379,8 +400,8 @@ export function Sheet({
           <View style={styles.sheetGrabber} />
           {title ? (
             <View style={styles.sheetHeader}>
-              <Text style={Type.title}>{title}</Text>
-              <IconButton icon="close" label="Close" onPress={onClose} size={34} />
+              <Text style={[Type.title, styles.sheetTitle]}>{title}</Text>
+              <IconButton icon="close" label="Close" onPress={onClose} size={40} />
             </View>
           ) : null}
           {children}
@@ -408,10 +429,10 @@ export function EmptyState({
   return (
     <View style={styles.empty}>
       <View style={styles.emptyIcon}>
-        <Ionicons name={icon} size={26} color={Palette.mute} />
+        <Ionicons name={icon} size={30} color={Palette.mute} />
       </View>
       <Text style={[Type.heading, { textAlign: 'center' }]}>{title}</Text>
-      {body ? <Text style={[Type.small, { textAlign: 'center', lineHeight: 19 }]}>{body}</Text> : null}
+      {body ? <Text style={[Type.small, styles.emptyBody]}>{body}</Text> : null}
       {action}
     </View>
   );
@@ -449,9 +470,10 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
 
   btn: {
-    minHeight: 52,
+    minHeight: 56,
     borderRadius: 16,
     paddingHorizontal: 20,
+    paddingVertical: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -463,8 +485,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Palette.hairline,
   },
-  btnGhost: { backgroundColor: 'transparent', minHeight: 44 },
-  btnText: { fontSize: 16, fontWeight: '700', letterSpacing: -0.1 },
+  btnGhost: { backgroundColor: 'transparent', minHeight: Touch.min },
+  btnText: { fontSize: 17, fontWeight: '700', letterSpacing: -0.1, textAlign: 'center', flexShrink: 1 },
 
   iconBtn: {
     alignItems: 'center',
@@ -478,23 +500,24 @@ const styles = StyleSheet.create({
   chipRowOuter: { marginHorizontal: -20, flexGrow: 0 },
   chipRow: { paddingHorizontal: 20, gap: 8 },
   chip: {
-    paddingHorizontal: 14,
-    height: 36,
-    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    minHeight: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     backgroundColor: Palette.surface,
     borderWidth: 1,
     borderColor: Palette.hairline,
   },
   chipActive: { backgroundColor: Palette.ink, borderColor: Palette.ink },
-  chipText: { fontSize: 14, fontWeight: '600', color: Palette.inkSoft },
+  chipText: { fontSize: 15, fontWeight: '600', color: Palette.inkSoft },
   chipTextActive: { color: '#FFFFFF' },
 
   segment: {
     flexDirection: 'row',
     backgroundColor: Palette.surfaceMuted,
-    borderRadius: 12,
-    padding: 3,
+    borderRadius: 14,
+    padding: 4,
   },
   segmentItem: {
     flex: 1,
@@ -502,9 +525,10 @@ const styles = StyleSheet.create({
     gap: 6,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
+    minHeight: 44,
+    paddingVertical: 10,
     paddingHorizontal: 12,
-    borderRadius: 10,
+    borderRadius: 11,
   },
   segmentItemActive: {
     backgroundColor: Palette.surface,
@@ -514,35 +538,36 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     elevation: 1,
   },
-  segmentText: { fontSize: 13, fontWeight: '600', color: Palette.mute },
+  segmentText: { fontSize: 15, fontWeight: '600', color: Palette.mute },
   segmentTextActive: { color: Palette.ink },
 
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 5,
     alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
     borderRadius: 999,
   },
-  pillText: { fontSize: 12, fontWeight: '700' },
+  pillText: { fontSize: 13, fontWeight: '700' },
 
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
+    minHeight: 88,
     paddingVertical: 10,
     paddingHorizontal: 10,
     marginHorizontal: -10,
     borderRadius: 16,
   },
   rowPressed: { backgroundColor: Palette.surfaceMuted },
-  rowThumb: { width: 60, height: 60, borderRadius: 14, backgroundColor: Palette.surfaceMuted },
-  rowBody: { flex: 1, gap: 3 },
-  rowTitle: { fontSize: 16, fontWeight: '600', color: Palette.ink, letterSpacing: -0.2 },
-  rowState: { alignItems: 'center', gap: 2 },
-  rowStateText: { fontSize: 11, fontWeight: '600', color: Palette.green },
+  rowThumb: { width: 70, height: 70, borderRadius: 16, backgroundColor: Palette.surfaceMuted },
+  rowBody: { flex: 1, gap: 4 },
+  rowTitle: { fontSize: 17, lineHeight: 22, fontWeight: '600', color: Palette.ink, letterSpacing: -0.2 },
+  rowState: { alignItems: 'center', gap: 2, minWidth: 32 },
+  rowStateText: { fontSize: 13, fontWeight: '600', color: Palette.green },
 
   sheetWrap: { flex: 1, justifyContent: 'flex-end', backgroundColor: Palette.overlay },
   sheet: {
@@ -563,13 +588,15 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: Palette.hairline,
   },
-  sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  sheetTitle: { flex: 1 },
 
-  empty: { alignItems: 'center', gap: 8, paddingVertical: 40, paddingHorizontal: 24 },
+  empty: { alignItems: 'center', gap: 10, paddingVertical: 40, paddingHorizontal: 24 },
+  emptyBody: { textAlign: 'center', lineHeight: 21 },
   emptyIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: Palette.surfaceMuted,
     alignItems: 'center',
     justifyContent: 'center',

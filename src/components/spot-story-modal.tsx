@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
 import {
   Alert,
-  Image,
   Linking,
   Modal,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PasskeySheet } from '@/components/passkey-sheet';
@@ -25,8 +26,9 @@ import {
   tr,
   walkMinutes,
 } from '@/components/ui/kit';
+import { getPhotoCredit } from '@/constants/photo-credits';
 import { AppLanguage, calculateDistanceKm, resolveText, Spot } from '@/constants/spots';
-import { Palette, Type } from '@/constants/theme';
+import { Palette, TIGHT_FONT_SCALE, Type } from '@/constants/theme';
 import { unlockedMessage, useNfcUnlock } from '@/hooks/use-nfc-unlock';
 import { useUnlocks } from '@/hooks/use-unlocks';
 import { useUserLocation } from '@/hooks/use-user-location';
@@ -54,6 +56,10 @@ function openDirections(spot: Spot, title: string) {
   Linking.openURL(url).catch(() => Linking.openURL(web).catch(() => {}));
 }
 
+function openPhotoSource(url: string) {
+  Linking.openURL(url).catch((e) => console.warn('Could not open photo source', e));
+}
+
 /**
  * Spot page. Locked: what it is + how to unlock it.
  * Unlocked: the story player. Nothing else competes for attention.
@@ -76,6 +82,7 @@ export function SpotStoryModal({ spot, language, visible, onClose }: Props) {
   if (!spot) return null;
 
   const title = resolveText(spot.title, language);
+  const credit = getPhotoCredit(spot.id);
   const isUnlocked = UnlockService.isUnlocked(spot.id);
   const daysLeft = UnlockService.getDaysRemaining(spot.id);
   const km = calculateDistanceKm(location.latitude, location.longitude, spot.latitude, spot.longitude);
@@ -102,7 +109,30 @@ export function SpotStoryModal({ spot, language, visible, onClose }: Props) {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 16) + 24 }}>
           <View style={styles.hero}>
-            <Image source={spotImage(spot)} style={styles.heroImage} resizeMode="cover" />
+            <Image
+              source={spotImage(spot)}
+              style={styles.heroImage}
+              contentFit="cover"
+              transition={200}
+              cachePolicy="memory-disk"
+              accessibilityIgnoresInvertColors
+            />
+            {credit ? (
+              <Pressable
+                accessibilityRole="link"
+                accessibilityLabel={tr(
+                  language,
+                  `Photo by ${credit.author}, ${credit.license}. Opens the source page.`,
+                  `Nuotraukos autorius ${credit.author}, ${credit.license}. Atidaro šaltinio puslapį.`
+                )}
+                hitSlop={10}
+                onPress={() => openPhotoSource(credit.sourceUrl)}
+                style={({ pressed }) => [styles.credit, pressed && styles.creditPressed]}>
+                <Text style={styles.creditText} numberOfLines={1} maxFontSizeMultiplier={TIGHT_FONT_SCALE}>
+                  {tr(language, 'Photo', 'Nuotrauka')}: {credit.author} · {credit.license}
+                </Text>
+              </Pressable>
+            ) : null}
             <View style={[styles.close, { top: closeTop }]}>
               <IconButton icon="close" label={tr(language, 'Close', 'Uždaryti')} tone="glass" onPress={onClose} />
             </View>
@@ -132,7 +162,7 @@ export function SpotStoryModal({ spot, language, visible, onClose }: Props) {
             ) : (
               <View style={styles.lockCard}>
                 <View style={styles.lockIcon}>
-                  <Ionicons name="phone-portrait-outline" size={26} color={Palette.gold} />
+                  <Ionicons name="phone-portrait-outline" size={30} color={Palette.gold} />
                 </View>
                 <Text style={styles.lockTitle}>{tr(language, 'Tap the plaque to unlock', 'Priglauskite prie lentelės')}</Text>
                 <Text style={styles.lockBody}>
@@ -176,7 +206,7 @@ export function SpotStoryModal({ spot, language, visible, onClose }: Props) {
                 <Text style={Type.heading}>{tr(language, 'While you’re there', 'Ką veikti')}</Text>
                 {spot.activities.slice(0, MAX_ACTIVITIES).map((a, i) => (
                   <View key={i} style={styles.todoRow}>
-                    <Ionicons name="ellipse" size={6} color={Palette.green} style={styles.bullet} />
+                    <Ionicons name="ellipse" size={7} color={Palette.green} style={styles.bullet} />
                     <Text style={[Type.body, styles.flex]}>{resolveText(a, language)}</Text>
                   </View>
                 ))}
@@ -207,8 +237,20 @@ const styles = StyleSheet.create({
   fullWidth: { alignSelf: 'stretch' },
 
   hero: { height: 300, backgroundColor: Palette.surfaceMuted },
-  heroImage: { width: '100%', height: '100%' },
+  heroImage: { width: '100%', height: '100%', backgroundColor: Palette.surfaceMuted },
   close: { position: 'absolute', right: 16 },
+  credit: {
+    position: 'absolute',
+    right: 12,
+    bottom: 38, // sits just above the rounded body overlap
+    maxWidth: '80%',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  creditPressed: { opacity: 0.7 },
+  creditText: { fontSize: 12, color: '#FFFFFF', fontWeight: '500' },
 
   body: {
     padding: 20,
@@ -222,11 +264,11 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   titleBlock: { gap: 8 },
-  title: { fontSize: 28, fontWeight: '800', letterSpacing: -0.6, color: Palette.ink },
+  title: { fontSize: 30, lineHeight: 36, fontWeight: '800', letterSpacing: -0.6, color: Palette.ink },
 
   lockCard: {
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
     padding: 20,
     borderRadius: 24,
     backgroundColor: Palette.surface,
@@ -235,9 +277,9 @@ const styles = StyleSheet.create({
     borderColor: Palette.gold,
   },
   lockIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: Palette.goldTint,
     alignItems: 'center',
     justifyContent: 'center',
@@ -245,7 +287,7 @@ const styles = StyleSheet.create({
   lockTitle: { ...Type.heading, textAlign: 'center' },
   lockBody: { ...Type.body, textAlign: 'center', marginBottom: 4 },
 
-  todo: { gap: 10 },
-  todoRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
-  bullet: { marginTop: 8 },
+  todo: { gap: 12 },
+  todoRow: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
+  bullet: { marginTop: 9 },
 });

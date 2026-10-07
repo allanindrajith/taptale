@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { AppLanguage, resolveText, Spot } from '@/constants/spots';
-import { Palette } from '@/constants/theme';
+import { Palette, Touch } from '@/constants/theme';
 import { AudioMode, AudioService } from '@/services/audio-service';
 import { IconButton, Segmented, tr } from '@/components/ui/kit';
 
@@ -108,15 +108,15 @@ export function StoryPlayer({ spot, language }: Props) {
             accessibilityLabel={isPlaying ? tr(language, 'Pause', 'Pauzė') : tr(language, 'Play', 'Groti')}
             onPress={togglePlay}
             style={({ pressed }) => [styles.playBtn, pressed && styles.pressed]}>
-            <Ionicons name={isPlaying ? 'pause' : 'play'} size={26} color="#FFFFFF" style={!isPlaying && styles.playNudge} />
+            <Ionicons name={isPlaying ? 'pause' : 'play'} size={30} color="#FFFFFF" style={!isPlaying && styles.playNudge} />
           </Pressable>
           <View style={styles.flex}>
-            <Text style={styles.trackTitle} numberOfLines={1}>
+            <Text style={styles.trackTitle} numberOfLines={2}>
               {mode === 'voice'
                 ? tr(language, `Chapter ${chapter + 1}`, `${chapter + 1} skyrius`)
                 : tr(language, 'Ambient music', 'Aplinkos muzika')}
             </Text>
-            <Text style={styles.trackSub} numberOfLines={1}>
+            <Text style={styles.trackSub} numberOfLines={2}>
               {trackName}
             </Text>
             <View style={styles.track}>
@@ -137,13 +137,13 @@ export function StoryPlayer({ spot, language }: Props) {
               <IconButton
                 icon="chevron-back"
                 label={tr(language, 'Previous chapter', 'Ankstesnis skyrius')}
-                size={36}
+                size={44}
                 onPress={() => goTo(Math.max(0, chapter - 1))}
               />
               <IconButton
                 icon="chevron-forward"
                 label={tr(language, 'Next chapter', 'Kitas skyrius')}
-                size={36}
+                size={44}
                 onPress={() => goTo(Math.min(lastIndex, chapter + 1))}
               />
             </View>
@@ -165,9 +165,9 @@ export function StoryPlayer({ spot, language }: Props) {
             accessibilityState={{ expanded: isLoreOpen }}
             onPress={() => setIsLoreOpen((v) => !v)}
             style={styles.loreHead}>
-            <Ionicons name="sparkles-outline" size={18} color={Palette.gold} />
+            <Ionicons name="sparkles-outline" size={20} color={Palette.gold} />
             <Text style={styles.loreTitle}>{tr(language, 'Hidden details', 'Paslaptys')}</Text>
-            <Ionicons name={isLoreOpen ? 'chevron-up' : 'chevron-down'} size={18} color={Palette.mute} />
+            <Ionicons name={isLoreOpen ? 'chevron-up' : 'chevron-down'} size={20} color={Palette.mute} />
           </Pressable>
           {isLoreOpen
             ? lore.map((item, i) => (
@@ -197,19 +197,19 @@ const styles = StyleSheet.create({
   },
   playerRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   playBtn: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     backgroundColor: Palette.green,
     alignItems: 'center',
     justifyContent: 'center',
   },
   playNudge: { marginLeft: 3 },
-  trackTitle: { fontSize: 16, fontWeight: '700', color: Palette.ink },
-  trackSub: { fontSize: 13, color: Palette.mute, marginTop: 2 },
+  trackTitle: { fontSize: 18, lineHeight: 23, fontWeight: '700', color: Palette.ink },
+  trackSub: { fontSize: 15, lineHeight: 20, color: Palette.mute, marginTop: 2 },
   track: {
-    height: 4,
-    borderRadius: 2,
+    height: 5,
+    borderRadius: 3,
     backgroundColor: Palette.surfaceMuted,
     marginTop: 10,
     overflow: 'hidden',
@@ -217,10 +217,10 @@ const styles = StyleSheet.create({
   trackFill: { height: '100%', backgroundColor: Palette.green },
 
   reader: { gap: 12 },
-  readerHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  chapterLabel: { fontSize: 12, fontWeight: '700', letterSpacing: 0.6, color: Palette.mute, textTransform: 'uppercase' },
+  readerHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  chapterLabel: { flexShrink: 1, fontSize: 13, fontWeight: '700', letterSpacing: 0.6, color: Palette.mute, textTransform: 'uppercase' },
   pager: { flexDirection: 'row', gap: 8 },
-  chapterText: { fontSize: 17, lineHeight: 27, color: Palette.ink },
+  chapterText: { fontSize: 19, lineHeight: 30, color: Palette.ink },
   dots: { flexDirection: 'row', gap: 6, justifyContent: 'center', paddingTop: 4 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Palette.hairline },
   dotActive: { width: 18, backgroundColor: Palette.green },
@@ -231,7 +231,7 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 10,
   },
-  loreHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  loreTitle: { flex: 1, fontSize: 15, fontWeight: '700', color: Palette.ink },
-  loreText: { fontSize: 15, lineHeight: 23, color: Palette.inkSoft },
+  loreHead: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: Touch.min },
+  loreTitle: { flex: 1, fontSize: 17, fontWeight: '700', color: Palette.ink },
+  loreText: { fontSize: 17, lineHeight: 25, color: Palette.inkSoft },
 });

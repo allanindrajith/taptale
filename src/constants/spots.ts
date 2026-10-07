@@ -305,7 +305,7 @@ export const SPOTS: Spot[] = [
       en: 'Where the legend of Vilnius and the Iron Wolf begins.',
       lt: 'Kur prasideda Vilniaus ir Geležinio vilko legenda.',
     },
-    imageUrl: require('../../assets/images/gediminas_tower.jpg'),
+    imageUrl: require('../../assets/images/spots/vln-gediminas-tower.jpg'),
     durationMinutes: 45,
     activities: [
       {
@@ -377,7 +377,7 @@ export const SPOTS: Spot[] = [
       en: 'The civic, spiritual, and patriotic heart of Lithuania.',
       lt: 'Vilniaus ir visos Lietuvos dvasinė ir pilietinė širdis.',
     },
-    imageUrl: require('../../assets/images/cathedral_square.jpg'),
+    imageUrl: require('../../assets/images/spots/vln-cathedral-square.jpg'),
     durationMinutes: 40,
     activities: [
       {
@@ -449,7 +449,7 @@ export const SPOTS: Spot[] = [
       en: 'Sole surviving city gate and venerated sacred pilgrimage shrine.',
       lt: 'Vieninteliai išlikę gynybiniai miesto vartai ir šventovė.',
     },
-    imageUrl: require('../../assets/images/gate_of_dawn.jpg'),
+    imageUrl: require('../../assets/images/spots/vln-gate-of-dawn.jpg'),
     durationMinutes: 30,
     activities: [
       {
@@ -521,7 +521,7 @@ export const SPOTS: Spot[] = [
       en: 'Northern European beacon of science, astronomy, and poetry since 1579.',
       lt: 'Mokslo, astronomijos ir poezijos židinys nuo 1579 m.',
     },
-    imageUrl: require('../../assets/images/vilnius_university.jpg'),
+    imageUrl: require('../../assets/images/spots/vln-university.jpg'),
     durationMinutes: 60,
     activities: [
       {
@@ -593,7 +593,7 @@ export const SPOTS: Spot[] = [
       en: 'Independent bohemian enclave of artists, philosophers, and cats.',
       lt: 'Laisvoji menininkų, filosofų ir katinų respublika.',
     },
-    imageUrl: require('../../assets/images/uzupis.jpg'),
+    imageUrl: require('../../assets/images/spots/vln-uzupis.jpg'),
     durationMinutes: 50,
     activities: [
       {
@@ -665,7 +665,7 @@ export const SPOTS: Spot[] = [
       en: 'Flamboyant Gothic jewel crafted from 33 distinct shapes of clay brick.',
       lt: 'Liepsnojančios gotikos šedevras, sumūrytas iš 33 rūšių plytų.',
     },
-    imageUrl: require('../../assets/images/st_anne_church.jpg'),
+    imageUrl: require('../../assets/images/spots/vln-st-anne-church.jpg'),
     durationMinutes: 35,
     activities: [
       {
@@ -737,7 +737,7 @@ export const SPOTS: Spot[] = [
       en: 'Panoramic monument on the Bleak Hill honoring Franciscan martyrs and Lithuanian rebirth.',
       lt: 'Paminklas ant Plikojo kalno, menantis pranciškonų kankinius ir tautos atgimimą.',
     },
-    imageUrl: require('../../assets/images/three_crosses.jpg'),
+    imageUrl: require('../../assets/images/spots/vln-three-crosses.jpg'),
     durationMinutes: 40,
     activities: [
       {
@@ -809,7 +809,7 @@ export const SPOTS: Spot[] = [
       en: 'Renaissance and Baroque seat of Lithuanian sovereigns and European diplomacy.',
       lt: 'Renesanso ir baroko Lietuvos valdovų bei diplomatijos rezidencija.',
     },
-    imageUrl: require('../../assets/images/grand_dukes_palace.jpg'),
+    imageUrl: require('../../assets/images/spots/vln-grand-dukes-palace.jpg'),
     durationMinutes: 70,
     activities: [
       {
@@ -881,7 +881,7 @@ export const SPOTS: Spot[] = [
       en: 'Baroque masterpiece adorned with over 2,000 pure white stucco figures.',
       lt: 'Baroko perlas su daugiau nei 2 000 baltų gipso skulptūrų ir reljefų.',
     },
-    imageUrl: 'https://images.unsplash.com/photo-1548625361-19597793574c?auto=format&fit=crop&w=1200&q=80',
+    imageUrl: require('../../assets/images/spots/vln-peter-paul-church.jpg'),
     durationMinutes: 45,
     activities: [
       {
@@ -953,7 +953,7 @@ export const SPOTS: Spot[] = [
       en: '17th-century artillery fortification and legendary lair of the Vilnius Basilisk.',
       lt: 'XVII a. artilerijos gynybinis fortas ir legendinio Vilniaus Bazilisko buveinė.',
     },
-    imageUrl: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80',
+    imageUrl: require('../../assets/images/spots/vln-bastion.jpg'),
     durationMinutes: 40,
     activities: [
       {
@@ -1025,7 +1025,7 @@ export const SPOTS: Spot[] = [
       en: 'Historic botanical sanctuary nestled in the romantic curve of the Vilnia River.',
       lt: 'Istorinis botanikos sodas prie srauniosios Vilnelės vingių.',
     },
-    imageUrl: 'https://images.unsplash.com/photo-1588714477688-cf28a50e94f7?auto=format&fit=crop&w=1200&q=80',
+    imageUrl: require('../../assets/images/spots/vln-bernardine-garden.jpg'),
     durationMinutes: 35,
     activities: [
       {
@@ -1097,7 +1097,7 @@ export const SPOTS: Spot[] = [
       en: 'Lithuania’s oldest brick fortress guarding the confluence of Nemunas and Neris.',
       lt: 'Seniausia mūrinė Lietuvos pilis ties Nemuno ir Neries santaka.',
     },
-    imageUrl: 'https://images.unsplash.com/photo-1590496793929-36417d3117de?auto=format&fit=crop&w=1200&q=80',
+    imageUrl: require('../../assets/images/spots/kns-kaunas-castle.jpg'),
     durationMinutes: 45,
     activities: [
       {
@@ -1169,7 +1169,7 @@ export const SPOTS: Spot[] = [
       en: 'Italian High Baroque jewel and spiritual sanctuary on the Kaunas Lagoon shore.',
       lt: 'Itališkojo brandžiojo baroko šedevras ant Kauno marių kranto.',
     },
-    imageUrl: 'https://images.unsplash.com/photo-1548625361-19597793574c?auto=format&fit=crop&w=1200&q=80',
+    imageUrl: require('../../assets/images/spots/kns-pazaislis-monastery.jpg'),
     durationMinutes: 60,
     activities: [
       {
@@ -1241,7 +1241,7 @@ export const SPOTS: Spot[] = [
       en: "The beloved 'White Swan' tower presiding over the historic Hanseatic market square.",
       lt: 'Elegantiškoji „Baltoji gulbė“ istorinėje Hanzos pirklių aikštėje.',
     },
-    imageUrl: 'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?auto=format&fit=crop&w=1200&q=80',
+    imageUrl: require('../../assets/images/spots/kns-town-hall.jpg'),
     durationMinutes: 40,
     activities: [
       {
@@ -1313,7 +1313,7 @@ export const SPOTS: Spot[] = [
       en: 'Vintage 1935 funicular railway climbing to the panoramic rooftop of Kaunas.',
       lt: '1935 m. funikulierius ir įspūdinga Kauno senamiesčio panorama.',
     },
-    imageUrl: 'https://images.unsplash.com/photo-1506521781263-d8422e82f27a?auto=format&fit=crop&w=1200&q=80',
+    imageUrl: require('../../assets/images/spots/kns-aleksotas-funicular.jpg'),
     durationMinutes: 35,
     activities: [
       {
@@ -1385,7 +1385,7 @@ export const SPOTS: Spot[] = [
       en: 'Monumental Tsarist fortress and sculpted monument to human resilience.',
       lt: 'Monumentali tvirtovė ir memorialas žmogaus dvasios stiprybei.',
     },
-    imageUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1200&q=80',
+    imageUrl: require('../../assets/images/spots/kns-ninth-fort.jpg'),
     durationMinutes: 60,
     activities: [
       {
@@ -1457,7 +1457,7 @@ export const SPOTS: Spot[] = [
       en: 'Historic 470-meter wooden bridge stretching into the rolling amber waves of the Baltic.',
       lt: 'Garsusis 470 metrų tiltas, besidriekiantis į banguojančią Baltijos jūrą.',
     },
-    imageUrl: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80',
+    imageUrl: require('../../assets/images/spots/plg-sea-pier.jpg'),
     durationMinutes: 40,
     activities: [
       {
@@ -1529,7 +1529,7 @@ export const SPOTS: Spot[] = [
       en: "Count Tiškevičius' palace housing Europe’s premier collection of Baltic amber.",
       lt: 'Grafo Tiškevičiaus rūmai su turtingiausia Baltijos gintaro kolekcija.',
     },
-    imageUrl: 'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?auto=format&fit=crop&w=1200&q=80',
+    imageUrl: require('../../assets/images/spots/plg-amber-museum.jpg'),
     durationMinutes: 60,
     activities: [
       {
@@ -1601,7 +1601,7 @@ export const SPOTS: Spot[] = [
       en: 'Ancient coastal pagan sanctuary honoring the vestal virgin Grand Duchess Birutė.',
       lt: 'Senoji pagoniška šventvietė, sauganti kunigaikštienės Birutės atminimą.',
     },
-    imageUrl: 'https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=1200&q=80',
+    imageUrl: require('../../assets/images/spots/plg-birute-hill.jpg'),
     durationMinutes: 40,
     activities: [
       {
@@ -1673,7 +1673,7 @@ export const SPOTS: Spot[] = [
       en: 'Gothic red-brick medieval water stronghold on Lake Galvė.',
       lt: 'Gotikinė XIV–XV a. vandens pilis Galvės ežere.',
     },
-    imageUrl: require('../../assets/images/trakai_castle.jpg'),
+    imageUrl: require('../../assets/images/spots/trk-island-castle.jpg'),
     durationMinutes: 90,
     activities: [
       {
@@ -1745,7 +1745,7 @@ export const SPOTS: Spot[] = [
       en: 'World-renowned sanctuary of unwavering faith and peaceful resistance.',
       lt: 'Visame pasaulyje garsus nepalaužiamo tikėjimo ir laisvės kalnas.',
     },
-    imageUrl: require('../../assets/images/hill_of_crosses.jpg'),
+    imageUrl: require('../../assets/images/spots/sia-hill-of-crosses.jpg'),
     durationMinutes: 60,
     activities: [
       {

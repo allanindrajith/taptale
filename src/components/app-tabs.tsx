@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { IconName, tr } from '@/components/ui/kit';
-import { Palette } from '@/constants/theme';
+import { Palette, TIGHT_FONT_SCALE, Touch } from '@/constants/theme';
 import { useLanguage } from '@/hooks/use-language';
 
 interface TabButtonProps extends TabTriggerSlotProps {
@@ -24,9 +24,14 @@ function TabButton({ isFocused, icon, activeIcon, label, ...props }: TabButtonPr
       accessibilityLabel={label}
       style={({ pressed }) => [styles.tab, pressed && styles.pressed]}>
       <View style={[styles.iconWrap, isFocused && styles.iconWrapActive]}>
-        <Ionicons name={isFocused ? activeIcon : icon} size={22} color={color} />
+        <Ionicons name={isFocused ? activeIcon : icon} size={24} color={color} />
       </View>
-      <Text style={[styles.label, { color }, isFocused && styles.labelActive]}>{label}</Text>
+      <Text
+        style={[styles.label, { color }, isFocused && styles.labelActive]}
+        numberOfLines={1}
+        maxFontSizeMultiplier={TIGHT_FONT_SCALE}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -62,10 +67,10 @@ const styles = StyleSheet.create({
     borderTopColor: Palette.hairline,
     paddingTop: 8,
   },
-  tab: { flex: 1, alignItems: 'center', gap: 2 },
-  iconWrap: { width: 56, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  tab: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3, minHeight: Touch.min + 8 },
+  iconWrap: { width: 60, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   iconWrapActive: { backgroundColor: Palette.greenTint },
-  label: { fontSize: 11, fontWeight: '500' },
+  label: { fontSize: 12, fontWeight: '500' },
   labelActive: { fontWeight: '700' },
   pressed: { opacity: 0.7 },
 });

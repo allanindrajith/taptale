@@ -45,13 +45,21 @@ export const Palette = {
 } as const;
 
 export const Type = {
-  display: { fontSize: 32, fontWeight: '800' as const, letterSpacing: -0.8, color: Palette.ink },
-  title: { fontSize: 22, fontWeight: '700' as const, letterSpacing: -0.4, color: Palette.ink },
-  heading: { fontSize: 17, fontWeight: '700' as const, letterSpacing: -0.2, color: Palette.ink },
-  body: { fontSize: 15, lineHeight: 22, color: Palette.inkSoft },
-  small: { fontSize: 13, color: Palette.mute },
-  label: { fontSize: 12, fontWeight: '600' as const, letterSpacing: 0.6, color: Palette.mute },
+  display: { fontSize: 33, fontWeight: '800' as const, letterSpacing: -0.8, color: Palette.ink },
+  title: { fontSize: 24, lineHeight: 30, fontWeight: '700' as const, letterSpacing: -0.4, color: Palette.ink },
+  heading: { fontSize: 19, lineHeight: 25, fontWeight: '700' as const, letterSpacing: -0.2, color: Palette.ink },
+  body: { fontSize: 17, lineHeight: 25, color: Palette.inkSoft },
+  small: { fontSize: 15, lineHeight: 20, color: Palette.mute },
+  label: { fontSize: 13, fontWeight: '600' as const, letterSpacing: 0.6, color: Palette.mute },
 };
+
+/** Minimum comfortable touch target (pt) for buttons, chips, tabs. */
+export const Touch = {
+  min: 48,
+} as const;
+
+/** Cap for Dynamic Type scaling on very tight elements (chips, pills, tab labels). */
+export const TIGHT_FONT_SCALE = 1.6;
 
 export const Colors = {
   light: {
