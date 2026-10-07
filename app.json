@@ -13,6 +13,8 @@
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "TapTale uses your location to calculate real-time distance and travel time to heritage spots across Lithuania.",
         "NFCReaderUsageDescription": "TapTale uses NFC to scan physical heritage plaques at monuments across Lithuania to unlock historical stories and passes.",
+        "NSCameraUsageDescription": "TapTale uses the camera so you can take a profile photo.",
+        "NSPhotoLibraryUsageDescription": "TapTale uses your photo library so you can choose a profile photo.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -44,7 +46,15 @@
         }
       ],
       "expo-asset",
-      "react-native-nfc-manager"
+      "react-native-nfc-manager",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "TapTale uses your photo library so you can choose a profile photo.",
+          "cameraPermission": "TapTale uses the camera so you can take a profile photo.",
+          "microphonePermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

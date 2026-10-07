@@ -337,6 +337,25 @@ export const UserService = {
   },
 
   /**
+   * Update the editable profile fields (display name + photo).
+   * `avatarUri: null` removes the photo; `avatarId` optionally changes the fallback icon.
+   * The name is expected to be validated by the caller; it is trimmed and whitespace-collapsed here.
+   */
+  updateProfile(data: { name: string; avatarUri: string | null; avatarId?: string }) {
+    const name = data.name.trim().replace(/\s+/g, ' ');
+    const [firstName = '', ...rest] = name.split(' ');
+    currentProfile = {
+      ...currentProfile,
+      name,
+      firstName,
+      lastName: rest.join(' '),
+      avatarUri: data.avatarUri ?? undefined,
+      avatarId: data.avatarId ?? currentProfile.avatarId,
+    };
+    persistProfile();
+  },
+
+  /**
    * Toggle cloud backup sync
    */
   toggleCloudSync() {
