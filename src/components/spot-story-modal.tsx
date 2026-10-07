@@ -57,7 +57,9 @@ function openDirections(spot: Spot, title: string) {
 }
 
 function openPhotoSource(url: string) {
-  Linking.openURL(url).catch((e) => console.warn('Could not open photo source', e));
+  Linking.openURL(url).catch((e) => {
+    if (__DEV__) console.warn('Could not open photo source', e);
+  });
 }
 
 /**

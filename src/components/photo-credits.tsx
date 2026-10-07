@@ -16,7 +16,9 @@ interface Props {
 const MAX_SHEET_HEIGHT = 560;
 
 function openUrl(url: string) {
-  Linking.openURL(url).catch((e) => console.warn('Could not open photo credit link', e));
+  Linking.openURL(url).catch((e) => {
+    if (__DEV__) console.warn('Could not open photo credit link', e);
+  });
 }
 
 /** Lists the author + license of every spot photo (required by CC BY / BY-SA). */

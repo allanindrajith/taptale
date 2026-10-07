@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Alert, AppState, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+import { PhotoCreditsSheet } from '@/components/photo-credits';
 import { Button, Card, Header, IconName, Screen, SectionHeader, tr } from '@/components/ui/kit';
 import { AppLanguage } from '@/constants/spots';
 import { Palette, Type } from '@/constants/theme';
@@ -168,6 +169,7 @@ export default function HelpScreen() {
   const { language } = useLanguage();
   const [status, setStatus] = useState<NfcStatus>('checking');
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [isCreditsOpen, setIsCreditsOpen] = useState(false);
   // Guards against setState after unmount and against an older check finishing after a newer one.
   const checkId = useRef(0);
 
@@ -209,6 +211,7 @@ export default function HelpScreen() {
   const showSettingsButton = status === 'off' && Platform.OS === 'android';
 
   return (
+    <>
     <Screen>
       <Header title={tr(language, 'How it works', 'Kaip tai veikia')} />
 
@@ -299,10 +302,20 @@ export default function HelpScreen() {
             <Text style={styles.faqQ}>{tr(language, 'About TapTale', 'Apie TapTale')}</Text>
             <Ionicons name="open-outline" size={18} color={Palette.mute} />
           </Pressable>
-          {/* Photo credits row is wired in here by the lead (src/components/photo-credits.tsx). */}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={tr(language, 'Photo credits', 'Nuotraukų autoriai')}
+            onPress={() => setIsCreditsOpen(true)}
+            style={({ pressed }) => [styles.faqHead, styles.faqBorder, pressed && styles.pressed]}>
+            <Ionicons name="images-outline" size={22} color={Palette.green} />
+            <Text style={styles.faqQ}>{tr(language, 'Photo credits', 'Nuotraukų autoriai')}</Text>
+            <Ionicons name="chevron-forward" size={18} color={Palette.mute} />
+          </Pressable>
         </Card>
       </View>
     </Screen>
+    <PhotoCreditsSheet visible={isCreditsOpen} onClose={() => setIsCreditsOpen(false)} language={language} />
+    </>
   );
 }
 

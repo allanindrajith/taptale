@@ -17,7 +17,10 @@ Shared board for Claude Code and Antigravity agents working in this repo.
 | 3 | Passport: editable profile | Claude Code | done | `src/app/me.tsx`, `src/services/user-storage.ts` (new `updateProfile` only), `app.json` (camera/photo permission strings + `expo-image-picker` plugin entry), new `src/components/profile-editor.tsx` |
 | 4 | Help audit | Claude Code | done | `src/app/help.tsx` |
 | 5 | Sign in & registration | Claude Code | done | `src/components/auth-screen.tsx` (now a re-export), new `src/components/auth/` (`auth-screen.tsx`, `welcome-header.tsx`, `sign-in-form.tsx`, `register-form.tsx`, `text-field.tsx`, `apple-button.tsx`, `forgot-password-sheet.tsx`, `validation.ts`) |
-| 6 | Final integration (credits link, npm resync, tsc, consistency review) | Claude Code | todo | any of the above, after sections 1–5 are done |
+| 6 | Final integration (credits link, npm resync, tsc, consistency review) | Claude Code | done | `src/app/help.tsx` (Photo credits row), `src/app/index.tsx` (shared SectionHeader, „Atrasti“), `src/components/ui/kit.tsx` (SectionHeader a11y role), `src/hooks/use-nfc-unlock.ts` (one LT string only), `src/components/spot-story-modal.tsx` + `src/components/photo-credits.tsx` (dev-only logs), `app.json` (`usesAppleSignIn`), `package.json` / `package-lock.json` (`expo-file-system`, resync) |
+
+**Resolved in section 6:** LT „žymos“ → „lentelės“; Explore header „Atrasti“; `expo-file-system` declared; `usesAppleSignIn: true`.
+**Still open (owner decision):** native Music tab has no real audio (`audio-service.ts`); `user-storage.ts` security/behaviour issues listed below.
 
 ## Do not touch (any agent)
 - `src/services/unlock-storage.ts`, `src/services/nfc-service.ts`, `src/hooks/use-nfc-unlock.ts` — NFC scanning, `UnlockService.unlockSpot` and the 30-day timer must keep working.

@@ -34,7 +34,7 @@ export function useNfcUnlock({ language, onUnlocked, onFallback }: Options) {
         if (result.message?.toLowerCase().includes('cancel')) return;
 
         Alert.alert(
-          tr(language, 'Couldn’t read the plaque', 'Nepavyko nuskaityti žymos'),
+          tr(language, 'Couldn’t read the plaque', 'Nepavyko nuskaityti lentelės'),
           result.hardwareMissing
             ? tr(language, 'This phone can’t scan NFC. You can type the code printed on the plaque instead.', 'Šis telefonas nepalaiko NFC. Galite įvesti ant lentelės išspausdintą kodą.')
             : tr(language, 'Try holding the top of your phone closer, or type the plaque code.', 'Priglauskite telefono viršų arčiau arba įveskite lentelės kodą.'),

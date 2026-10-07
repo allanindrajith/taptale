@@ -9,6 +9,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "com.allanindrajith.taptale",
+      "usesAppleSignIn": true,
       "icon": "./assets/images/icon.png",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "TapTale uses your location to calculate real-time distance and travel time to heritage spots across Lithuania.",

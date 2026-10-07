@@ -18,7 +18,7 @@ import { LocationAnimation } from '@/components/location-animation';
 import { PasskeySheet } from '@/components/passkey-sheet';
 import { SpotStoryModal } from '@/components/spot-story-modal';
 import { getUnlockedPlaces, YourPlaces } from '@/components/your-places';
-import { Chip, ChipRow, EmptyState, Segmented, SpotRow, tr } from '@/components/ui/kit';
+import { Chip, ChipRow, EmptyState, SectionHeader, Segmented, SpotRow, tr } from '@/components/ui/kit';
 import { AppLanguage, calculateDistanceKm, CITIES, resolveText, Spot, SPOTS } from '@/constants/spots';
 import { Palette, Type } from '@/constants/theme';
 import { useLanguage } from '@/hooks/use-language';
@@ -163,7 +163,7 @@ export default function ExploreScreen() {
             <Text style={styles.placeText}>{place}</Text>
           </View>
           <Text style={Type.display} accessibilityRole="header">
-            {tr(language, 'Explore', 'Atraskite')}
+            {tr(language, 'Explore', 'Atrasti')}
           </Text>
         </View>
         <View style={styles.langToggle}>
@@ -231,12 +231,10 @@ export default function ExploreScreen() {
 
       {showYourPlaces ? (
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle} accessibilityRole="header">
-              {tr(language, 'Your places', 'Jūsų vietos')}
-            </Text>
-            {shortcuts.length > 0 ? <Text style={styles.sectionCount}>{shortcuts.length}</Text> : null}
-          </View>
+          <SectionHeader
+            title={tr(language, 'Your places', 'Jūsų vietos')}
+            trailing={shortcuts.length > 0 ? String(shortcuts.length) : undefined}
+          />
           <YourPlaces places={shortcuts} language={language} onOpen={setActiveSpot} />
         </View>
       ) : null}
@@ -268,12 +266,7 @@ export default function ExploreScreen() {
         ))}
       </ChipRow>
 
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle} accessibilityRole="header">
-          {tr(language, 'Places to discover', 'Vietos atrasti')}
-        </Text>
-        <Text style={styles.sectionCount}>{spots.length}</Text>
-      </View>
+      <SectionHeader title={tr(language, 'Places to discover', 'Vietos atrasti')} trailing={String(spots.length)} />
     </View>
   );
 
@@ -396,9 +389,6 @@ const styles = StyleSheet.create({
   progressText: { fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.92)' },
 
   section: { gap: 12 },
-  sectionHeader: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 },
-  sectionTitle: { flexShrink: 1, fontSize: 20, fontWeight: '700', letterSpacing: -0.3, color: Palette.ink },
-  sectionCount: { fontSize: 15, fontWeight: '600', color: Palette.mute },
 
   search: {
     flexDirection: 'row',

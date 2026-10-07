@@ -122,7 +122,9 @@ export function Header({
 export function SectionHeader({ title, trailing }: { title: string; trailing?: string }) {
   return (
     <View style={styles.sectionHeader}>
-      <Text style={Type.heading}>{title}</Text>
+      <Text style={Type.heading} accessibilityRole="header">
+        {title}
+      </Text>
       {trailing ? <Text style={Type.small}>{trailing}</Text> : null}
     </View>
   );
