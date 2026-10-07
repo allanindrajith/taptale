@@ -1,0 +1,237 @@
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+
+import { AppLanguage, resolveText, Spot } from '@/constants/spots';
+import { Palette } from '@/constants/theme';
+import { AudioMode, AudioService } from '@/services/audio-service';
+import { IconButton, Segmented, tr } from '@/components/ui/kit';
+
+interface Props {
+  spot: Spot;
+  language: AppLanguage;
+}
+
+/**
+ * Unlocked story: one chapter at a time, with a single play button that
+ * either narrates the chapters in sequence or plays the spot's ambient music.
+ */
+export function StoryPlayer({ spot, language }: Props) {
+  const chapters = useMemo(() => spot.story ?? [], [spot.story]);
+  const lastIndex = Math.max(0, chapters.length - 1);
+
+  const [chapter, setChapter] = useState(0);
+  const [mode, setMode] = useState<AudioMode>('voice');
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [isLoreOpen, setIsLoreOpen] = useState(false);
+  const isMounted = useRef(true);
+  // Lets a finished chapter start the next one without narrate() referencing itself
+  const narrateRef = useRef<(index: number) => void>(() => {});
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+      AudioService.stop();
+    };
+  }, []);
+
+  const stop = useCallback(() => {
+    AudioService.stop();
+    setIsPlaying(false);
+    setProgress(0);
+  }, []);
+
+  const narrate = useCallback(
+    (index: number) => {
+      setChapter(index);
+      setIsPlaying(true);
+      setProgress(0);
+      AudioService.playNarrator(
+        resolveText(chapters[index], language),
+        language,
+        (pct) => isMounted.current && setProgress(pct),
+        () => {
+          if (!isMounted.current) return;
+          if (index < lastIndex) narrateRef.current(index + 1);
+          else setIsPlaying(false);
+        }
+      );
+    },
+    [chapters, language, lastIndex]
+  );
+
+  useEffect(() => {
+    narrateRef.current = narrate;
+  }, [narrate]);
+
+  const togglePlay = () => {
+    if (isPlaying) return stop();
+    if (mode === 'voice') return narrate(chapter);
+    setIsPlaying(true);
+    AudioService.playMusic(spot.id, (pct) => isMounted.current && setProgress(pct));
+  };
+
+  const goTo = (index: number) => {
+    if (isPlaying && mode === 'voice') narrate(index);
+    else setChapter(index);
+  };
+
+  const switchMode = (next: AudioMode) => {
+    stop();
+    setMode(next);
+  };
+
+  const lore = spot.secretLore ?? [];
+  const trackName =
+    mode === 'voice'
+      ? resolveText(spot.audioGuide.narrator, language)
+      : resolveText(spot.audioGuide.musicTrack, language);
+
+  return (
+    <View style={styles.wrap}>
+      {/* Player */}
+      <View style={styles.player}>
+        <Segmented
+          value={mode}
+          onChange={switchMode}
+          options={[
+            { value: 'voice', label: tr(language, 'Story', 'Istorija'), icon: 'mic-outline' },
+            { value: 'music', label: tr(language, 'Music', 'Muzika'), icon: 'musical-notes-outline' },
+          ]}
+        />
+        <View style={styles.playerRow}>
+          <Pressable
+            testID="play-button"
+            accessibilityRole="button"
+            accessibilityLabel={isPlaying ? tr(language, 'Pause', 'Pauzė') : tr(language, 'Play', 'Groti')}
+            onPress={togglePlay}
+            style={({ pressed }) => [styles.playBtn, pressed && styles.pressed]}>
+            <Ionicons name={isPlaying ? 'pause' : 'play'} size={26} color="#FFFFFF" style={!isPlaying && styles.playNudge} />
+          </Pressable>
+          <View style={styles.flex}>
+            <Text style={styles.trackTitle} numberOfLines={1}>
+              {mode === 'voice'
+                ? tr(language, `Chapter ${chapter + 1}`, `${chapter + 1} skyrius`)
+                : tr(language, 'Ambient music', 'Aplinkos muzika')}
+            </Text>
+            <Text style={styles.trackSub} numberOfLines={1}>
+              {trackName}
+            </Text>
+            <View style={styles.track}>
+              <View style={[styles.trackFill, { width: `${progress}%` }]} />
+            </View>
+          </View>
+        </View>
+      </View>
+
+      {/* Reader */}
+      {chapters.length > 0 ? (
+        <View style={styles.reader}>
+          <View style={styles.readerHead}>
+            <Text style={styles.chapterLabel}>
+              {tr(language, 'Chapter', 'Skyrius')} {chapter + 1} / {chapters.length}
+            </Text>
+            <View style={styles.pager}>
+              <IconButton
+                icon="chevron-back"
+                label={tr(language, 'Previous chapter', 'Ankstesnis skyrius')}
+                size={36}
+                onPress={() => goTo(Math.max(0, chapter - 1))}
+              />
+              <IconButton
+                icon="chevron-forward"
+                label={tr(language, 'Next chapter', 'Kitas skyrius')}
+                size={36}
+                onPress={() => goTo(Math.min(lastIndex, chapter + 1))}
+              />
+            </View>
+          </View>
+          <Text style={styles.chapterText}>{resolveText(chapters[chapter], language)}</Text>
+          <View style={styles.dots}>
+            {chapters.map((_, i) => (
+              <View key={i} style={[styles.dot, i === chapter && styles.dotActive]} />
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      {/* Hidden details */}
+      {lore.length > 0 ? (
+        <View style={styles.lore}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ expanded: isLoreOpen }}
+            onPress={() => setIsLoreOpen((v) => !v)}
+            style={styles.loreHead}>
+            <Ionicons name="sparkles-outline" size={18} color={Palette.gold} />
+            <Text style={styles.loreTitle}>{tr(language, 'Hidden details', 'Paslaptys')}</Text>
+            <Ionicons name={isLoreOpen ? 'chevron-up' : 'chevron-down'} size={18} color={Palette.mute} />
+          </Pressable>
+          {isLoreOpen
+            ? lore.map((item, i) => (
+                <Text key={i} style={styles.loreText}>
+                  {resolveText(item, language)}
+                </Text>
+              ))
+            : null}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  wrap: { gap: 16 },
+  flex: { flex: 1 },
+  pressed: { opacity: 0.85, transform: [{ scale: 0.96 }] },
+
+  player: {
+    backgroundColor: Palette.surface,
+    borderRadius: 22,
+    padding: 16,
+    gap: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Palette.hairline,
+  },
+  playerRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  playBtn: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: Palette.green,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  playNudge: { marginLeft: 3 },
+  trackTitle: { fontSize: 16, fontWeight: '700', color: Palette.ink },
+  trackSub: { fontSize: 13, color: Palette.mute, marginTop: 2 },
+  track: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Palette.surfaceMuted,
+    marginTop: 10,
+    overflow: 'hidden',
+  },
+  trackFill: { height: '100%', backgroundColor: Palette.green },
+
+  reader: { gap: 12 },
+  readerHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  chapterLabel: { fontSize: 12, fontWeight: '700', letterSpacing: 0.6, color: Palette.mute, textTransform: 'uppercase' },
+  pager: { flexDirection: 'row', gap: 8 },
+  chapterText: { fontSize: 17, lineHeight: 27, color: Palette.ink },
+  dots: { flexDirection: 'row', gap: 6, justifyContent: 'center', paddingTop: 4 },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Palette.hairline },
+  dotActive: { width: 18, backgroundColor: Palette.green },
+
+  lore: {
+    backgroundColor: Palette.goldTint,
+    borderRadius: 18,
+    padding: 16,
+    gap: 10,
+  },
+  loreHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  loreTitle: { flex: 1, fontSize: 15, fontWeight: '700', color: Palette.ink },
+  loreText: { fontSize: 15, lineHeight: 23, color: Palette.inkSoft },
+});

@@ -22,6 +22,37 @@ export const WiseColors = {
   accentCyan: '#0284c7',
 } as const;
 
+/**
+ * Calm & minimal palette used by the redesigned screens.
+ * Warm paper background + a single forest-green accent.
+ */
+export const Palette = {
+  bg: '#F6F5F1',          // warm paper
+  surface: '#FFFFFF',
+  surfaceMuted: '#EFEEE8',
+  ink: '#131A15',
+  inkSoft: '#3E4842',
+  mute: '#858D88',
+  hairline: '#E5E3DC',
+  green: '#1d5c38',
+  greenDeep: '#123d24',
+  greenTint: '#E7F1EA',
+  gold: '#B98A3E',        // "collected" accent
+  goldTint: '#F6EEDD',
+  danger: '#B4442F',
+  dangerTint: '#F8E7E3',
+  overlay: 'rgba(10, 16, 12, 0.45)',
+} as const;
+
+export const Type = {
+  display: { fontSize: 32, fontWeight: '800' as const, letterSpacing: -0.8, color: Palette.ink },
+  title: { fontSize: 22, fontWeight: '700' as const, letterSpacing: -0.4, color: Palette.ink },
+  heading: { fontSize: 17, fontWeight: '700' as const, letterSpacing: -0.2, color: Palette.ink },
+  body: { fontSize: 15, lineHeight: 22, color: Palette.inkSoft },
+  small: { fontSize: 13, color: Palette.mute },
+  label: { fontSize: 12, fontWeight: '600' as const, letterSpacing: 0.6, color: Palette.mute },
+};
+
 export const Colors = {
   light: {
     text: WiseColors.ink,

@@ -25,16 +25,13 @@ export default function AppTabs() {
       <TabList asChild>
         <CustomTabList>
           <TabTrigger name="home" href="/" asChild>
-            <TabButton>{language === 'lt' ? 'Pradžia' : 'Home'}</TabButton>
-          </TabTrigger>
-          <TabTrigger name="search" href="/search" asChild>
-            <TabButton>{language === 'lt' ? 'Paieška' : 'Search'}</TabButton>
+            <TabButton>{language === 'lt' ? 'Atrasti' : 'Explore'}</TabButton>
           </TabTrigger>
           <TabTrigger name="me" href="/me" asChild>
-            <TabButton>{language === 'lt' ? 'Aš' : 'Me'}</TabButton>
+            <TabButton>{language === 'lt' ? 'Pasas' : 'Passport'}</TabButton>
           </TabTrigger>
           <TabTrigger name="help" href="/help" asChild>
-            <TabButton>{language === 'lt' ? 'Gidas' : 'Help'}</TabButton>
+            <TabButton>{language === 'lt' ? 'Pagalba' : 'Help'}</TabButton>
           </TabTrigger>
         </CustomTabList>
       </TabList>

@@ -170,6 +170,7 @@ export const UnlockService = {
     };
     memoryStore[spotId] = newRecord;
     persistCurrentStore();
+    notify();
     return newRecord;
   },
 

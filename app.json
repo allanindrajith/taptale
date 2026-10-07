@@ -10,12 +10,6 @@
     "ios": {
       "bundleIdentifier": "com.allanindrajith.taptale",
       "icon": "./assets/images/icon.png",
-      "entitlements": {
-        "com.apple.developer.nfc.readersession.formats": [
-          "NDEF",
-          "TAG"
-        ]
-      },
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "TapTale uses your location to calculate real-time distance and travel time to heritage spots across Lithuania.",
         "NFCReaderUsageDescription": "TapTale uses NFC to scan physical heritage plaques at monuments across Lithuania to unlock historical stories and passes.",
