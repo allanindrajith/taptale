@@ -30,8 +30,16 @@ const MANIFEST_FILE = path.join(ROOT, 'src/constants/spot-audio.generated.ts');
 const PROVENANCE_FILE = path.join(AUDIO_DIR, 'provenance.json');
 
 const API_URL = 'https://generativelanguage.googleapis.com/v1beta/interactions';
+const MUSIC_WS_URL =
+  'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateMusic';
 const TTS_MODEL = 'gemini-3.8-flash-tts';
-const MUSIC_MODEL = 'lyria-3.5';
+// Lyria RealTime: experimental streaming model, no per-track charge (Lyria 3.x / 3.5 are paid).
+const MUSIC_MODEL = 'lyria-realtime-exp';
+const MUSIC_SECONDS = 120;
+const MUSIC_RATE = 48000; // Lyria RealTime streams 16-bit stereo PCM at 48 kHz
+const FADE_IN_SECONDS = 2;
+const FADE_OUT_SECONDS = 5;
+const STALL_TIMEOUT_MS = 30000;
 const VOICE = 'Sulafat'; // "Warm"
 const NARRATION_STYLE =
   'Warm, calm heritage audio-guide narrator speaking to a visitor standing at the place. Unhurried pace, clear pronunciation, natural pauses between sentences.';
@@ -39,23 +47,47 @@ const LANGS = ['en', 'lt'];
 const MAX_RETRIES = 6;
 const REQUEST_GAP_MS = 1500;
 
-/** The four places that get generated audio, with a music brief for each. */
+/** The four places that get generated audio, with a Lyria RealTime music brief for each. */
 const TARGETS = {
   'vln-cathedral-square': {
-    music:
-      'Instrumental only, no vocals. About 2 minutes. A solemn, uplifting sacred piece for Vilnius Cathedral in Lithuania: majestic pipe organ, distant tolling church bells, soft sustained strings, slow tempo, spacious cathedral reverb. Calm opening, gentle swell, quiet ending.',
+    music: {
+      bpm: 66,
+      prompts: [
+        { text: 'Solemn sacred pipe organ, slow and majestic', weight: 1.0 },
+        { text: 'Distant tolling church bells', weight: 0.5 },
+        { text: 'Soft sustained strings, spacious cathedral reverb', weight: 0.6 },
+      ],
+    },
   },
   'vln-university': {
-    music:
-      'Instrumental only, no vocals. About 2 minutes. Late-Renaissance chamber music for Vilnius University, founded in 1579: bright harpsichord with a small string consort and recorder, scholarly and graceful, moderate tempo, intimate courtyard acoustics, quiet ending.',
+    music: {
+      bpm: 92,
+      prompts: [
+        { text: 'Late-Renaissance harpsichord, graceful and scholarly', weight: 1.0 },
+        { text: 'Small baroque string consort with recorder', weight: 0.6 },
+        { text: 'Intimate chamber music, bright and calm', weight: 0.4 },
+      ],
+    },
   },
   'trk-island-castle': {
-    music:
-      'Instrumental only, no vocals. About 2 minutes. Medieval Lithuanian atmosphere for Trakai Island Castle on Lake Galvė around the year 1400: kanklės (Baltic zither), lute and wooden flute over soft frame drums, gentle lake wind ambience, stately and calm, quiet ending.',
+    music: {
+      bpm: 76,
+      prompts: [
+        { text: 'Medieval Baltic zither (kankles) and lute, stately and calm', weight: 1.0 },
+        { text: 'Wooden flute melody over soft frame drums', weight: 0.6 },
+        { text: 'Gentle lake wind ambience', weight: 0.3 },
+      ],
+    },
   },
   'kns-kaunas-castle': {
-    music:
-      'Instrumental only, no vocals. About 2 minutes. Medieval fortress music for Kaunas Castle at the confluence of two rivers in the 14th century: low war drums, horns, hurdy-gurdy and fiddle, steady marching pulse, tense but not aggressive, distant river ambience, quiet ending.',
+    music: {
+      bpm: 84,
+      prompts: [
+        { text: 'Medieval fortress music, low war drums with a steady marching pulse', weight: 1.0 },
+        { text: 'Horns, hurdy-gurdy and fiddle, tense but not aggressive', weight: 0.7 },
+        { text: 'Distant river ambience', weight: 0.3 },
+      ],
+    },
   },
 };
 
@@ -63,6 +95,14 @@ const args = new Set(process.argv.slice(2));
 const FORCE = args.has('--force');
 const MANIFEST_ONLY = args.has('--manifest-only');
 const ONLY = [...args].find((a) => a.startsWith('--only='))?.split('=')[1]; // 'story' | 'music'
+// Free-tier TTS quotas are per model per day; another TTS model can finish the rest.
+const TTS_MODEL_ARG = [...args].find((a) => a.startsWith('--tts-model='))?.split('=')[1];
+// Optional filters, e.g. --spot=kns-kaunas-castle --lang=en
+const SPOT_ARG = [...args].find((a) => a.startsWith('--spot='))?.split('=')[1];
+const LANG_ARG = [...args].find((a) => a.startsWith('--lang='))?.split('=')[1];
+
+/** Thrown when Google reports a per-day quota — retrying today is pointless. */
+class DailyQuotaError extends Error {}
 
 /* ------------------------------------------------------------------ */
 /* Key + stories                                                       */
@@ -144,6 +184,9 @@ async function callGemini(apiKey, body, label) {
     if (res.ok && json) return json;
 
     const message = json?.error?.message ?? text.slice(0, 300);
+    if (res.status === 429 && /per day/i.test(message)) {
+      throw new DailyQuotaError(`${label}: daily free quota used up — ${message}`);
+    }
     const retryable = res.status === 429 || res.status >= 500;
     if (retryable && attempt < MAX_RETRIES) {
       const wait = retryDelayMs(json, attempt);
@@ -177,27 +220,120 @@ function extractAudio(json) {
 
 function sniffFormat(buffer, mime) {
   if (buffer.subarray(0, 4).toString('ascii') === 'RIFF') return 'wav';
-  if (buffer.subarray(0, 3).toString('ascii') === 'ID3' || (buffer[0] === 0xff && (buffer[1] & 0xe0) === 0xe0)) return 'mp3';
-  if (mime.includes('l16') || mime.includes('pcm')) return 'pcm';
-  return mime.includes('mpeg') ? 'mp3' : 'wav';
+  // Only trust an explicit ID3 tag or MIME type: a bare 0xFFEx "frame sync" can also be
+  // the first PCM sample of headerless TTS audio, which was once mis-saved as .mp3.
+  if (buffer.subarray(0, 3).toString('ascii') === 'ID3' || mime.includes('mpeg')) return 'mp3';
+  // Anything without a RIFF/MP3 header is raw 16-bit PCM (some TTS models return it headerless).
+  return 'pcm';
 }
 
-/** Wraps raw 16-bit mono PCM in a WAV header (used if the API returns headerless PCM). */
-function pcmToWav(pcm, sampleRate = 24000) {
+/** Wraps raw 16-bit PCM in a WAV header (used if the API returns headerless PCM). */
+function pcmToWav(pcm, sampleRate = 24000, channels = 1) {
+  const blockAlign = channels * 2;
   const header = Buffer.alloc(44);
   header.write('RIFF', 0);
   header.writeUInt32LE(36 + pcm.length, 4);
   header.write('WAVEfmt ', 8);
   header.writeUInt32LE(16, 16);
   header.writeUInt16LE(1, 20);
-  header.writeUInt16LE(1, 22);
+  header.writeUInt16LE(channels, 22);
   header.writeUInt32LE(sampleRate, 24);
-  header.writeUInt32LE(sampleRate * 2, 28);
-  header.writeUInt16LE(2, 32);
+  header.writeUInt32LE(sampleRate * blockAlign, 28);
+  header.writeUInt16LE(blockAlign, 32);
   header.writeUInt16LE(16, 34);
   header.write('data', 36);
   header.writeUInt32LE(pcm.length, 40);
   return Buffer.concat([header, pcm]);
+}
+
+/** Returns a copy of 16-bit stereo PCM with a linear fade-in and fade-out (for smooth looping). */
+function withFades(pcm, rate, fadeInSec, fadeOutSec) {
+  const out = Buffer.from(pcm);
+  const frames = out.length / 4;
+  const fadeIn = Math.min(frames, Math.round(rate * fadeInSec));
+  const fadeOut = Math.min(frames, Math.round(rate * fadeOutSec));
+  for (let f = 0; f < frames; f++) {
+    let gain = 1;
+    if (f < fadeIn) gain = f / fadeIn;
+    if (f >= frames - fadeOut) gain = Math.min(gain, (frames - f) / fadeOut);
+    if (gain === 1) continue;
+    for (let ch = 0; ch < 2; ch++) {
+      const i = f * 4 + ch * 2;
+      out.writeInt16LE(Math.round(out.readInt16LE(i) * gain), i);
+    }
+  }
+  return out;
+}
+
+/**
+ * Streams music from Lyria RealTime over a WebSocket and resolves with
+ * `seconds` of 16-bit stereo PCM at 48 kHz.
+ */
+function recordRealtimeMusic(apiKey, { prompts, bpm }, seconds, label) {
+  const targetBytes = MUSIC_RATE * 4 * seconds;
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(`${MUSIC_WS_URL}?key=${encodeURIComponent(apiKey)}`);
+    const chunks = [];
+    let bytes = 0;
+    let settled = false;
+    let stallTimer;
+    let lastPct = -1;
+
+    const finish = (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(stallTimer);
+      try {
+        ws.send(JSON.stringify({ playbackControl: 'STOP' }));
+      } catch {}
+      try {
+        ws.close();
+      } catch {}
+      if (err) reject(new Error(`${label}: ${err}`));
+      else resolve(Buffer.concat(chunks).subarray(0, targetBytes));
+    };
+    const armStall = () => {
+      clearTimeout(stallTimer);
+      stallTimer = setTimeout(() => finish(`no audio for ${STALL_TIMEOUT_MS / 1000}s`), STALL_TIMEOUT_MS);
+    };
+
+    ws.onopen = () => {
+      armStall();
+      ws.send(JSON.stringify({ setup: { model: `models/${MUSIC_MODEL}` } }));
+    };
+    ws.onerror = (e) => finish(`connection error ${e?.message ?? ''}`.trim());
+    ws.onclose = (e) => {
+      if (bytes < targetBytes) finish(`connection closed early (${e.code}${e.reason ? ` ${e.reason}` : ''})`);
+    };
+    ws.onmessage = async (ev) => {
+      const text = typeof ev.data === 'string' ? ev.data : Buffer.from(await ev.data.arrayBuffer()).toString('utf8');
+      let msg;
+      try {
+        msg = JSON.parse(text);
+      } catch {
+        return;
+      }
+      if (msg.setupComplete) {
+        ws.send(JSON.stringify({ clientContent: { weightedPrompts: prompts } }));
+        ws.send(JSON.stringify({ musicGenerationConfig: { bpm, temperature: 1.0 } }));
+        ws.send(JSON.stringify({ playbackControl: 'PLAY' }));
+        return;
+      }
+      if (msg.filteredPrompt) return finish(`prompt was filtered: ${JSON.stringify(msg.filteredPrompt)}`);
+      for (const chunk of msg.serverContent?.audioChunks ?? []) {
+        const buf = Buffer.from(chunk.data, 'base64');
+        chunks.push(buf);
+        bytes += buf.length;
+        armStall();
+        const pct = Math.floor((Math.min(bytes, targetBytes) / targetBytes) * 4) * 25;
+        if (pct !== lastPct && pct < 100) {
+          lastPct = pct;
+          console.log(`   … ${label}: ${pct}%`);
+        }
+        if (bytes >= targetBytes) return finish();
+      }
+    };
+  });
 }
 
 let hasAfconvert;
@@ -263,29 +399,32 @@ async function generateNarration(apiKey, spotId, chapters, provenance) {
   let log = provenance;
   const dir = path.join(AUDIO_DIR, spotId);
   for (const lang of LANGS) {
+    if (LANG_ARG && lang !== LANG_ARG) continue;
+    // Keep one model per place+language so a story never changes voice mid-way.
+    const earlier = FORCE ? undefined : log.find((e) => e.spotId === spotId && e.kind === 'narration' && e.lang === lang);
+    const model = earlier?.model ?? TTS_MODEL_ARG ?? TTS_MODEL;
     for (let i = 0; i < chapters.length; i++) {
       const base = `story-${lang}-${i + 1}`;
       if (!FORCE && existing(dir, base)) continue;
       const text = chapterText(chapters[i], lang);
       if (!text) continue;
-      console.log(`→ ${spotId} ${base} (${text.length} chars)`);
+      console.log(`→ ${spotId} ${base} (${text.length} chars, ${model})`);
+      // Only the 3.8 TTS models accept a speech_metadata style annotation; older ones reject it.
+      const annotations = model.startsWith('gemini-3.8')
+        ? [{ type: 'speech_metadata', style: NARRATION_STYLE }]
+        : undefined;
       const json = await callGemini(
         apiKey,
         {
-          model: TTS_MODEL,
-          input: [
-            {
-              type: 'user_input',
-              content: [{ type: 'text', text, annotations: [{ type: 'speech_metadata', style: NARRATION_STYLE }] }],
-            },
-          ],
+          model,
+          input: [{ type: 'user_input', content: [{ type: 'text', text, ...(annotations ? { annotations } : {}) }] }],
           response_format: { type: 'audio' },
           generation_config: { speech_config: [{ voice: VOICE }] },
         },
         `${spotId} ${base}`
       );
       const file = saveAudio(dir, base, extractAudio(json), 64000);
-      log = recordProvenance(log, { spotId, file, kind: 'narration', lang, chapter: i + 1, model: TTS_MODEL, voice: VOICE });
+      log = recordProvenance(log, { spotId, file, kind: 'narration', lang, chapter: i + 1, model, voice: VOICE });
       fs.writeFileSync(PROVENANCE_FILE, JSON.stringify(log, null, 2));
       await sleep(REQUEST_GAP_MS);
     }
@@ -296,11 +435,20 @@ async function generateNarration(apiKey, spotId, chapters, provenance) {
 async function generateMusic(apiKey, spotId, provenance) {
   const dir = path.join(AUDIO_DIR, spotId);
   if (!FORCE && existing(dir, 'music')) return provenance;
-  const prompt = TARGETS[spotId].music;
-  console.log(`→ ${spotId} music`);
-  const json = await callGemini(apiKey, { model: MUSIC_MODEL, input: prompt }, `${spotId} music`);
-  const file = saveAudio(dir, 'music', extractAudio(json), 128000);
-  const log = recordProvenance(provenance, { spotId, file, kind: 'music', model: MUSIC_MODEL, prompt });
+  const brief = TARGETS[spotId].music;
+  console.log(`→ ${spotId} music (${MUSIC_SECONDS}s, recorded in real time)`);
+  const pcm = await recordRealtimeMusic(apiKey, brief, MUSIC_SECONDS, `${spotId} music`);
+  const wav = pcmToWav(withFades(pcm, MUSIC_RATE, FADE_IN_SECONDS, FADE_OUT_SECONDS), MUSIC_RATE, 2);
+  const file = saveAudio(dir, 'music', { buffer: wav, mime: 'audio/wav' }, 128000);
+  const log = recordProvenance(provenance, {
+    spotId,
+    file,
+    kind: 'music',
+    model: MUSIC_MODEL,
+    prompts: brief.prompts,
+    bpm: brief.bpm,
+    seconds: MUSIC_SECONDS,
+  });
   fs.writeFileSync(PROVENANCE_FILE, JSON.stringify(log, null, 2));
   return log;
 }
@@ -358,13 +506,19 @@ async function main() {
 
   let provenance = loadProvenance();
   const failures = [];
+  let isTtsQuotaUsed = false;
   for (const spotId of Object.keys(TARGETS)) {
-    if (ONLY !== 'music') {
+    if (SPOT_ARG && spotId !== SPOT_ARG) continue;
+    if (ONLY !== 'music' && !isTtsQuotaUsed) {
       try {
         provenance = await generateNarration(apiKey, spotId, stories[spotId], provenance);
       } catch (err) {
         failures.push(err.message);
         console.error(`✗ ${err.message}`);
+        if (err instanceof DailyQuotaError) {
+          isTtsQuotaUsed = true;
+          console.error('  Skipping the remaining narration for today. Re-run tomorrow, or pass --tts-model=<another TTS model>.');
+        }
       }
     }
     if (ONLY !== 'story') {

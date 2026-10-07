@@ -2,4 +2,27 @@
 import type { SpotAudioManifest } from './spot-audio';
 
 export const GENERATED_SPOT_AUDIO: SpotAudioManifest = {
+  'vln-cathedral-square': {
+    narration: {
+      en: [require('../../assets/audio/vln-cathedral-square/story-en-1.m4a'), require('../../assets/audio/vln-cathedral-square/story-en-2.m4a'), require('../../assets/audio/vln-cathedral-square/story-en-3.m4a'), require('../../assets/audio/vln-cathedral-square/story-en-4.m4a')],
+      lt: [require('../../assets/audio/vln-cathedral-square/story-lt-1.m4a'), require('../../assets/audio/vln-cathedral-square/story-lt-2.m4a'), require('../../assets/audio/vln-cathedral-square/story-lt-3.m4a'), require('../../assets/audio/vln-cathedral-square/story-lt-4.m4a')],
+    },
+    music: require('../../assets/audio/vln-cathedral-square/music.m4a'),
+  },
+  'vln-university': {
+    narration: {
+      en: [require('../../assets/audio/vln-university/story-en-1.m4a'), require('../../assets/audio/vln-university/story-en-2.m4a'), require('../../assets/audio/vln-university/story-en-3.m4a'), require('../../assets/audio/vln-university/story-en-4.m4a')],
+      lt: [require('../../assets/audio/vln-university/story-lt-1.m4a'), require('../../assets/audio/vln-university/story-lt-2.m4a'), require('../../assets/audio/vln-university/story-lt-3.m4a'), require('../../assets/audio/vln-university/story-lt-4.m4a')],
+    },
+    music: require('../../assets/audio/vln-university/music.m4a'),
+  },
+  'trk-island-castle': {
+    music: require('../../assets/audio/trk-island-castle/music.m4a'),
+  },
+  'kns-kaunas-castle': {
+    narration: {
+      en: [require('../../assets/audio/kns-kaunas-castle/story-en-1.m4a'), require('../../assets/audio/kns-kaunas-castle/story-en-2.m4a'), require('../../assets/audio/kns-kaunas-castle/story-en-3.m4a'), require('../../assets/audio/kns-kaunas-castle/story-en-4.m4a')],
+    },
+    music: require('../../assets/audio/kns-kaunas-castle/music.m4a'),
+  },
 };

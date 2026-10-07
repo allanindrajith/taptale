@@ -1,0 +1,324 @@
+[
+  {
+    "spotId": "vln-cathedral-square",
+    "file": "story-en-1.m4a",
+    "kind": "narration",
+    "lang": "en",
+    "chapter": 1,
+    "model": "gemini-3.8-flash-tts",
+    "voice": "Sulafat",
+    "generatedAt": "2026-10-07T10:09:04.783Z"
+  },
+  {
+    "spotId": "vln-cathedral-square",
+    "file": "story-en-2.m4a",
+    "kind": "narration",
+    "lang": "en",
+    "chapter": 2,
+    "model": "gemini-3.8-flash-tts",
+    "voice": "Sulafat",
+    "generatedAt": "2026-10-07T10:09:23.832Z"
+  },
+  {
+    "spotId": "vln-cathedral-square",
+    "file": "story-en-3.m4a",
+    "kind": "narration",
+    "lang": "en",
+    "chapter": 3,
+    "model": "gemini-3.8-flash-tts",
+    "voice": "Sulafat",
+    "generatedAt": "2026-10-07T10:09:40.579Z"
+  },
+  {
+    "spotId": "vln-cathedral-square",
+    "file": "story-en-4.m4a",
+    "kind": "narration",
+    "lang": "en",
+    "chapter": 4,
+    "model": "gemini-3.8-flash-tts",
+    "voice": "Sulafat",
+    "generatedAt": "2026-10-07T10:09:59.418Z"
+  },
+  {
+    "spotId": "vln-cathedral-square",
+    "file": "story-lt-1.m4a",
+    "kind": "narration",
+    "lang": "lt",
+    "chapter": 1,
+    "model": "gemini-3.8-flash-tts",
+    "voice": "Sulafat",
+    "generatedAt": "2026-10-07T10:10:12.460Z"
+  },
+  {
+    "spotId": "vln-cathedral-square",
+    "file": "story-lt-2.m4a",
+    "kind": "narration",
+    "lang": "lt",
+    "chapter": 2,
+    "model": "gemini-3.8-flash-tts",
+    "voice": "Sulafat",
+    "generatedAt": "2026-10-07T10:10:30.582Z"
+  },
+  {
+    "spotId": "vln-cathedral-square",
+    "file": "story-lt-3.m4a",
+    "kind": "narration",
+    "lang": "lt",
+    "chapter": 3,
+    "model": "gemini-3.8-flash-tts",
+    "voice": "Sulafat",
+    "generatedAt": "2026-10-07T10:10:43.830Z"
+  },
+  {
+    "spotId": "vln-cathedral-square",
+    "file": "story-lt-4.m4a",
+    "kind": "narration",
+    "lang": "lt",
+    "chapter": 4,
+    "model": "gemini-3.8-flash-tts",
+    "voice": "Sulafat",
+    "generatedAt": "2026-10-07T10:11:01.138Z"
+  },
+  {
+    "spotId": "vln-university",
+    "file": "story-en-1.m4a",
+    "kind": "narration",
+    "lang": "en",
+    "chapter": 1,
+    "model": "gemini-3.8-flash-tts",
+    "voice": "Sulafat",
+    "generatedAt": "2026-10-07T10:11:16.897Z"
+  },
+  {
+    "spotId": "vln-university",
+    "file": "story-en-2.m4a",
+    "kind": "narration",
+    "lang": "en",
+    "chapter": 2,
+    "model": "gemini-3.8-flash-tts",
+    "voice": "Sulafat",
+    "generatedAt": "2026-10-07T10:11:32.467Z"
+  },
+  {
+    "spotId": "vln-university",
+    "file": "story-en-3.m4a",
+    "kind": "narration",
+    "lang": "en",
+    "chapter": 3,
+    "model": "gemini-3.8-flash-tts",
+    "voice": "Sulafat",
+    "generatedAt": "2026-10-07T10:11:51.111Z"
+  },
+  {
+    "spotId": "vln-university",
+    "file": "story-en-4.m4a",
+    "kind": "narration",
+    "lang": "en",
+    "chapter": 4,
+    "model": "gemini-3.8-flash-tts",
+    "voice": "Sulafat",
+    "generatedAt": "2026-10-07T10:12:13.578Z"
+  },
+  {
+    "spotId": "vln-cathedral-square",
+    "file": "music.m4a",
+    "kind": "music",
+    "model": "lyria-realtime-exp",
+    "prompts": [
+      {
+        "text": "Solemn sacred pipe organ, slow and majestic",
+        "weight": 1
+      },
+      {
+        "text": "Distant tolling church bells",
+        "weight": 0.5
+      },
+      {
+        "text": "Soft sustained strings, spacious cathedral reverb",
+        "weight": 0.6
+      }
+    ],
+    "bpm": 66,
+    "seconds": 120,
+    "generatedAt": "2026-10-07T10:20:33.553Z"
+  },
+  {
+    "spotId": "vln-university",
+    "file": "music.m4a",
+    "kind": "music",
+    "model": "lyria-realtime-exp",
+    "prompts": [
+      {
+        "text": "Late-Renaissance harpsichord, graceful and scholarly",
+        "weight": 1
+      },
+      {
+        "text": "Small baroque string consort with recorder",
+        "weight": 0.6
+      },
+      {
+        "text": "Intimate chamber music, bright and calm",
+        "weight": 0.4
+      }
+    ],
+    "bpm": 92,
+    "seconds": 120,
+    "generatedAt": "2026-10-07T10:22:35.146Z"
+  },
+  {
+    "spotId": "trk-island-castle",
+    "file": "music.m4a",
+    "kind": "music",
+    "model": "lyria-realtime-exp",
+    "prompts": [
+      {
+        "text": "Medieval Baltic zither (kankles) and lute, stately and calm",
+        "weight": 1
+      },
+      {
+        "text": "Wooden flute melody over soft frame drums",
+        "weight": 0.6
+      },
+      {
+        "text": "Gentle lake wind ambience",
+        "weight": 0.3
+      }
+    ],
+    "bpm": 76,
+    "seconds": 120,
+    "generatedAt": "2026-10-07T10:24:37.729Z"
+  },
+  {
+    "spotId": "kns-kaunas-castle",
+    "file": "music.m4a",
+    "kind": "music",
+    "model": "lyria-realtime-exp",
+    "prompts": [
+      {
+        "text": "Medieval fortress music, low war drums with a steady marching pulse",
+        "weight": 1
+      },
+      {
+        "text": "Horns, hurdy-gurdy and fiddle, tense but not aggressive",
+        "weight": 0.7
+      },
+      {
+        "text": "Distant river ambience",
+        "weight": 0.3
+      }
+    ],
+    "bpm": 84,
+    "seconds": 120,
+    "generatedAt": "2026-10-07T10:26:39.587Z"
+  },
+  {
+    "spotId": "vln-university",
+    "file": "story-lt-1.m4a",
+    "kind": "narration",
+    "lang": "lt",
+    "chapter": 1,
+    "model": "gemini-3.1-flash-tts-preview",
+    "voice": "Sulafat",
+    "generatedAt": "2026-10-07T10:27:17.182Z"
+  },
+  {
+    "spotId": "vln-university",
+    "file": "story-lt-2.m4a",
+    "kind": "narration",
+    "lang": "lt",
+    "chapter": 2,
+    "model": "gemini-3.1-flash-tts-preview",
+    "voice": "Sulafat",
+    "generatedAt": "2026-10-07T10:27:42.224Z"
+  },
+  {
+    "spotId": "vln-university",
+    "file": "story-lt-3.m4a",
+    "kind": "narration",
+    "lang": "lt",
+    "chapter": 3,
+    "model": "gemini-3.1-flash-tts-preview",
+    "voice": "Sulafat",
+    "generatedAt": "2026-10-07T10:28:00.156Z"
+  },
+  {
+    "spotId": "vln-university",
+    "file": "story-lt-4.m4a",
+    "kind": "narration",
+    "lang": "lt",
+    "chapter": 4,
+    "model": "gemini-3.1-flash-tts-preview",
+    "voice": "Sulafat",
+    "generatedAt": "2026-10-07T10:31:19.875Z"
+  },
+  {
+    "spotId": "trk-island-castle",
+    "file": "story-en-1.m4a",
+    "kind": "narration",
+    "lang": "en",
+    "chapter": 1,
+    "model": "gemini-3.1-flash-tts-preview",
+    "voice": "Sulafat",
+    "generatedAt": "2026-10-07T10:31:45.288Z"
+  },
+  {
+    "spotId": "trk-island-castle",
+    "file": "story-en-2.m4a",
+    "kind": "narration",
+    "lang": "en",
+    "chapter": 2,
+    "model": "gemini-3.1-flash-tts-preview",
+    "voice": "Sulafat",
+    "generatedAt": "2026-10-07T10:32:09.490Z"
+  },
+  {
+    "spotId": "trk-island-castle",
+    "file": "story-en-3.m4a",
+    "kind": "narration",
+    "lang": "en",
+    "chapter": 3,
+    "model": "gemini-3.1-flash-tts-preview",
+    "voice": "Sulafat",
+    "generatedAt": "2026-10-07T10:32:31.460Z"
+  },
+  {
+    "spotId": "kns-kaunas-castle",
+    "file": "story-en-1.m4a",
+    "kind": "narration",
+    "lang": "en",
+    "chapter": 1,
+    "model": "gemini-2.5-flash-preview-tts",
+    "voice": "Sulafat",
+    "generatedAt": "2026-10-07T10:33:33.952Z"
+  },
+  {
+    "spotId": "kns-kaunas-castle",
+    "file": "story-en-2.m4a",
+    "kind": "narration",
+    "lang": "en",
+    "chapter": 2,
+    "model": "gemini-2.5-flash-preview-tts",
+    "voice": "Sulafat",
+    "generatedAt": "2026-10-07T10:33:56.295Z"
+  },
+  {
+    "spotId": "kns-kaunas-castle",
+    "file": "story-en-3.m4a",
+    "kind": "narration",
+    "lang": "en",
+    "chapter": 3,
+    "model": "gemini-2.5-flash-preview-tts",
+    "voice": "Sulafat",
+    "generatedAt": "2026-10-07T10:34:15.116Z"
+  },
+  {
+    "spotId": "kns-kaunas-castle",
+    "file": "story-en-4.m4a",
+    "kind": "narration",
+    "lang": "en",
+    "chapter": 4,
+    "model": "gemini-2.5-flash-preview-tts",
+    "voice": "Sulafat",
+    "generatedAt": "2026-10-07T10:34:33.132Z"
+  }
+]
