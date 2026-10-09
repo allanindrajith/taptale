@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Alert,
   Linking,
   Modal,
   Platform,
@@ -14,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { DirectionsSheet } from '@/components/directions-sheet';
 import { PasskeySheet } from '@/components/passkey-sheet';
 import { StoryPlayer } from '@/components/story-player';
 import {
@@ -29,32 +29,23 @@ import {
 import { getPhotoCredit } from '@/constants/photo-credits';
 import { AppLanguage, calculateDistanceKm, resolveText, Spot } from '@/constants/spots';
 import { Palette, TIGHT_FONT_SCALE, Type } from '@/constants/theme';
-import { unlockedMessage, useNfcUnlock } from '@/hooks/use-nfc-unlock';
-import { useUnlocks } from '@/hooks/use-unlocks';
+import { showUnlockedAlert, useNfcUnlock } from '@/hooks/use-nfc-unlock';
+import { usePass } from '@/hooks/use-unlocks';
+import { useDirections } from '@/hooks/use-directions';
 import { useUserLocation } from '@/hooks/use-user-location';
-import { UnlockService } from '@/services/unlock-storage';
 
 interface Props {
   spot: Spot | null;
   language: AppLanguage;
   visible: boolean;
   onClose: () => void;
+  /** Show another spot in this sheet (e.g. the user unlocked a different place's plaque). */
+  onOpenSpot: (spot: Spot) => void;
 }
 
 /** Any spot closer than this counts as "you're here". */
 const HERE_KM = 0.05;
 const MAX_ACTIVITIES = 3;
-
-function openDirections(spot: Spot, title: string) {
-  const { latitude: lat, longitude: lng } = spot;
-  const web = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
-  const url = Platform.select({
-    ios: `http://maps.apple.com/?daddr=${lat},${lng}&q=${encodeURIComponent(title)}`,
-    android: `geo:${lat},${lng}?q=${lat},${lng}(${encodeURIComponent(title)})`,
-    default: web,
-  });
-  Linking.openURL(url).catch(() => Linking.openURL(web).catch(() => {}));
-}
 
 function openPhotoSource(url: string) {
   Linking.openURL(url).catch((e) => {
@@ -66,27 +57,29 @@ function openPhotoSource(url: string) {
  * Spot page. Locked: what it is + how to unlock it.
  * Unlocked: the story player. Nothing else competes for attention.
  */
-export function SpotStoryModal({ spot, language, visible, onClose }: Props) {
+export function SpotStoryModal({ spot, language, visible, onClose, onOpenSpot }: Props) {
   const insets = useSafeAreaInsets();
   const { location } = useUserLocation();
-  useUnlocks(); // re-render when this spot gets unlocked
+  // Live status: flips to unlocked the moment a scan succeeds, no app restart needed
+  const { isUnlocked, daysLeft } = usePass(spot?.id);
   const [isPasskeyOpen, setIsPasskeyOpen] = useState(false);
+  const { startDirections, sheet: directionsSheet } = useDirections();
 
   const { scanning, scan } = useNfcUnlock({
     language,
-    onUnlocked: (s, renewed) => {
+    onUnlocked: (s, alreadyUnlocked) => {
       setIsPasskeyOpen(false);
-      Alert.alert(tr(language, 'Unlocked', 'Atrakinta'), unlockedMessage(s, renewed, language));
+      if (s.id !== spot?.id) onOpenSpot(s);
+      showUnlockedAlert(s, alreadyUnlocked, language);
     },
     onFallback: () => setIsPasskeyOpen(true),
+    onDirections: startDirections,
   });
 
   if (!spot) return null;
 
   const title = resolveText(spot.title, language);
   const credit = getPhotoCredit(spot.id);
-  const isUnlocked = UnlockService.isUnlocked(spot.id);
-  const daysLeft = UnlockService.getDaysRemaining(spot.id);
   const km = calculateDistanceKm(location.latitude, location.longitude, spot.latitude, spot.longitude);
   const isHere = km <= HERE_KM;
   const meta = [
@@ -200,7 +193,7 @@ export function SpotStoryModal({ spot, language, visible, onClose }: Props) {
               variant="secondary"
               icon="navigate-outline"
               label={tr(language, 'Directions', 'Maršrutas')}
-              onPress={() => openDirections(spot, title)}
+              onPress={() => startDirections(spot)}
             />
 
             {spot.activities.length > 0 ? (
@@ -217,15 +210,18 @@ export function SpotStoryModal({ spot, language, visible, onClose }: Props) {
           </View>
         </ScrollView>
 
+        <DirectionsSheet {...directionsSheet} language={language} />
+
         <PasskeySheet
           visible={isPasskeyOpen}
           spot={spot}
           language={language}
           userCoords={location}
           onClose={() => setIsPasskeyOpen(false)}
-          onUnlocked={(s) => {
+          onUnlocked={(s, alreadyUnlocked) => {
             setIsPasskeyOpen(false);
-            Alert.alert(tr(language, 'Unlocked', 'Atrakinta'), unlockedMessage(s, false, language));
+            if (s.id !== spot.id) onOpenSpot(s);
+            showUnlockedAlert(s, alreadyUnlocked, language);
           }}
         />
       </View>

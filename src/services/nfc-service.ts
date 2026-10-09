@@ -21,6 +21,10 @@ export interface NfcScanResult {
   success: boolean;
   spot?: Spot;
   alreadyUnlocked?: boolean;
+  /** Genuine plaque, but for a different place than the one being scanned for. `spot` is the plaque's place. */
+  wrongPlace?: boolean;
+  /** The plaque's key, so the UI can unlock `spot` if the user chooses to. */
+  tagKey?: string;
   message: string;
   hardwareMissing?: boolean;
 }
@@ -235,15 +239,23 @@ export const NfcService = {
         };
       }
 
-      // If scanning for a specific monument, verify it matches
+      // Scanning for a specific monument but this is another place's plaque:
+      // nothing is unlocked yet; the UI asks whether to unlock that place instead.
       if (targetSpot && matchedSpot.id !== targetSpot.id) {
+        if (!UnlockService.keyMatches(parsedData.key, matchedSpot.nfcSecretKey)) {
+          return {
+            success: false,
+            message: '❌ Invalid NFC plaque signature. This tag is rejected.',
+          };
+        }
         return {
           success: false,
-          message: `Tag belongs to "${matchedSpot.title.en}", not "${targetSpot.title.en}". Please scan the plaque for this specific monument.`,
+          wrongPlace: true,
+          spot: matchedSpot,
+          tagKey: parsedData.key,
+          message: `This plaque is for "${matchedSpot.title.en}", not "${targetSpot.title.en}".`,
         };
       }
-
-      const alreadyUnlocked = UnlockService.isUnlocked(matchedSpot.id);
 
       // Cryptographically validate the physical tag secret key
       const validation = UnlockService.validateAndUnlock(
@@ -259,12 +271,13 @@ export const NfcService = {
         };
       }
 
+      const alreadyUnlocked = !!validation.alreadyUnlocked;
       return {
         success: true,
         spot: matchedSpot,
         alreadyUnlocked,
         message: alreadyUnlocked
-          ? `Welcome back to ${matchedSpot.title.en}! 30-Day access renewed.`
+          ? `${matchedSpot.title.en} is already unlocked.`
           : `🎉 Physical NFC Tag Verified! 30-Day pass activated for ${matchedSpot.title.en}.`,
       };
     } catch (err: any) {

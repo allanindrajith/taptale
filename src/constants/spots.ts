@@ -288,7 +288,7 @@ export const CITIES: City[] = [
   },
   {
     id: 'sia',
-    name: { en: 'Šiauliai region', lt: 'Šiaulių regionas' },
+    name: { en: 'Šiauliai', lt: 'Šiauliai' },
   },
 ];
 

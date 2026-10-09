@@ -15,7 +15,7 @@ interface Props {
   language: AppLanguage;
   userCoords: { latitude: number; longitude: number };
   onClose: () => void;
-  onUnlocked: (spot: Spot) => void;
+  onUnlocked: (spot: Spot, alreadyUnlocked: boolean) => void;
 }
 
 /**
@@ -66,7 +66,7 @@ export function PasskeySheet({ visible, spot, language, userCoords, onClose, onU
     const res = UnlockService.validateAndUnlock(matched.id, clean, matched.nfcSecretKey);
     if (res.success) {
       reset();
-      onUnlocked(matched);
+      onUnlocked(matched, !!res.alreadyUnlocked);
     } else {
       setError(tr(language, 'That code doesn’t match. Check the plaque and try again.', 'Kodas netinka. Patikrinkite lentelę ir bandykite dar kartą.'));
     }

@@ -107,6 +107,22 @@ export const UnlockService = {
   },
 
   /**
+   * Pull-to-refresh: re-read the current user's passes from storage and
+   * notify, so every screen recomputes unlocked state and days left.
+   */
+  async reload() {
+    try {
+      const stored = await SafeStorage.getItem(getStorageKey(activeUserEmail));
+      if (stored !== null && stored !== undefined) {
+        memoryStore = JSON.parse(stored) || {};
+      }
+    } catch (e) {
+      if (__DEV__) console.warn('Could not reload passes', e);
+    }
+    notify();
+  },
+
+  /**
    * Reset passes: Keeps ONLY Cathedral Square unlocked, and locks all other 6 places.
    * Gives a clean testing state for physical NFC plaques while keeping one sample pass active.
    */
@@ -174,22 +190,30 @@ export const UnlockService = {
     return newRecord;
   },
 
+  /** True when a plaque key matches the spot's key (case/whitespace-insensitive). */
+  keyMatches(providedKey: string, expectedKey: string): boolean {
+    if (!providedKey || !expectedKey) return false;
+    return providedKey.trim().toUpperCase() === expectedKey.trim().toUpperCase();
+  },
+
   /**
    * Validate secret password/key from physical NFC tag and unlock if valid.
+   * An active pass is left as-is (not extended) so the user sees its real days left.
    */
   validateAndUnlock(
     spotId: string,
     providedKey: string,
     expectedKey: string
-  ): { success: boolean; message: string } {
+  ): { success: boolean; alreadyUnlocked?: boolean; message: string } {
     if (!providedKey || !expectedKey) {
       return { success: false, message: 'Missing NFC security key.' };
     }
-    const cleanProvided = providedKey.trim().toUpperCase();
-    const cleanExpected = expectedKey.trim().toUpperCase();
-    if (cleanProvided === cleanExpected) {
+    if (this.keyMatches(providedKey, expectedKey)) {
+      if (this.isUnlocked(spotId)) {
+        return { success: true, alreadyUnlocked: true, message: 'Already unlocked.' };
+      }
       this.unlockSpot(spotId);
-      return { success: true, message: 'Verified! 30-Day pass activated.' };
+      return { success: true, alreadyUnlocked: false, message: 'Verified! 30-Day pass activated.' };
     }
     return {
       success: false,

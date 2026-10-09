@@ -16,7 +16,8 @@
         "NFCReaderUsageDescription": "TapTale uses NFC to scan physical heritage plaques at monuments across Lithuania to unlock historical stories and passes.",
         "NSCameraUsageDescription": "TapTale uses the camera so you can take a profile photo.",
         "NSPhotoLibraryUsageDescription": "TapTale uses your photo library so you can choose a profile photo.",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "LSApplicationQueriesSchemes": ["comgooglemaps", "waze", "uber", "bolt"]
       }
     },
     "android": {
@@ -47,6 +48,7 @@
         }
       ],
       "expo-asset",
+      "./plugins/with-map-app-queries",
       "react-native-nfc-manager",
       [
         "expo-image-picker",

@@ -22,10 +22,14 @@ import { Chip, ChipRow, EmptyState, SectionHeader, Segmented, SpotRow, tr } from
 import { AppLanguage, calculateDistanceKm, CITIES, resolveText, Spot, SPOTS } from '@/constants/spots';
 import { Palette, Type } from '@/constants/theme';
 import { useLanguage } from '@/hooks/use-language';
-import { unlockedMessage, useNfcUnlock } from '@/hooks/use-nfc-unlock';
+import { showUnlockedAlert, useNfcUnlock } from '@/hooks/use-nfc-unlock';
 import { useUnlocks } from '@/hooks/use-unlocks';
 import { useUserLocation } from '@/hooks/use-user-location';
 import { UnlockService } from '@/services/unlock-storage';
+
+/** "Nearby" only lists places within this distance of the user; the rest live under their city chip. */
+const NEARBY_KM = 5;
+const NEARBY = 'nearby';
 
 interface SpotWithDistance {
   spot: Spot;
@@ -48,7 +52,7 @@ export default function ExploreScreen() {
   const { unlockedCount, total, version } = useUnlocks();
 
   const [query, setQuery] = useState('');
-  const [city, setCity] = useState('all');
+  const [city, setCity] = useState(NEARBY);
   const [activeSpot, setActiveSpot] = useState<Spot | null>(null);
   const [passkeySpot, setPasskeySpot] = useState<Spot | null>(null);
   const [isPasskeyOpen, setIsPasskeyOpen] = useState(false);
@@ -74,9 +78,11 @@ export default function ExploreScreen() {
 
   // The list below holds only places still to unlock.
   const lockedSpots = byDistance.filter(({ spot }) => !unlockedIds.has(spot.id));
-  const spots = lockedSpots.filter(
-    ({ spot }) => (city === 'all' || spot.cityID === city) && matchesQuery(spot, q, language)
-  );
+  // A search in Nearby looks everywhere, so a place outside the radius is never "not found".
+  const inFilter = ({ spot, km }: SpotWithDistance) =>
+    city === NEARBY ? q !== '' || km <= NEARBY_KM : spot.cityID === city;
+  const spots = lockedSpots.filter((item) => inFilter(item) && matchesQuery(item.spot, q, language));
+  const isNearbyEmpty = city === NEARBY && !q;
   const showYourPlaces = shortcuts.length > 0 || (!q && unlockedPlaces.length === 0);
 
   const nearest = byDistance[0]?.spot;
@@ -89,11 +95,12 @@ export default function ExploreScreen() {
     [nearest]
   );
 
+  // New unlock or already-active pass: either way, take the user to that place
   const handleUnlocked = useCallback(
-    (spot: Spot, renewed: boolean) => {
+    (spot: Spot, alreadyUnlocked: boolean) => {
       setIsPasskeyOpen(false);
       setActiveSpot(spot);
-      Alert.alert(tr(language, 'Unlocked', 'Atrakinta'), unlockedMessage(spot, renewed, language));
+      showUnlockedAlert(spot, alreadyUnlocked, language);
     },
     [language]
   );
@@ -125,10 +132,9 @@ export default function ExploreScreen() {
       const spot = SPOTS.find((s) => s.id === spotId);
       if (!spot || !key) return;
 
-      const renewed = UnlockService.isUnlocked(spot.id);
       const res = UnlockService.validateAndUnlock(spot.id, key, spot.nfcSecretKey);
       if (res.success) {
-        handleUnlocked(spot, renewed);
+        handleUnlocked(spot, !!res.alreadyUnlocked);
       } else {
         Alert.alert(
           tr(language, 'Couldn’t unlock', 'Nepavyko atrakinti'),
@@ -145,7 +151,7 @@ export default function ExploreScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await refresh();
+      await Promise.all([refresh(), UnlockService.reload()]);
     } finally {
       setRefreshing(false);
     }
@@ -255,7 +261,7 @@ export default function ExploreScreen() {
       </View>
 
       <ChipRow>
-        <Chip label={tr(language, 'Nearby', 'Šalia')} active={city === 'all'} onPress={() => setCity('all')} />
+        <Chip label={tr(language, 'Nearby', 'Šalia')} active={city === NEARBY} onPress={() => setCity(NEARBY)} />
         {CITIES.map((c) => (
           <Chip
             key={c.id}
@@ -302,6 +308,16 @@ export default function ExploreScreen() {
                 'Surinkote visas istorijas. Jas rasite skiltyje „Jūsų vietos“.'
               )}
             />
+          ) : isNearbyEmpty ? (
+            <EmptyState
+              icon="navigate-outline"
+              title={tr(language, `Nothing within ${NEARBY_KM} km`, `Per ${NEARBY_KM} km nieko nėra`)}
+              body={tr(
+                language,
+                'Pick a city above to see its places.',
+                'Pasirinkite miestą viršuje ir pamatysite jo vietas.'
+              )}
+            />
           ) : (
             <EmptyState
               icon="search-outline"
@@ -318,10 +334,16 @@ export default function ExploreScreen() {
         language={language}
         userCoords={location}
         onClose={() => setIsPasskeyOpen(false)}
-        onUnlocked={(spot) => handleUnlocked(spot, false)}
+        onUnlocked={handleUnlocked}
       />
 
-      <SpotStoryModal spot={shownSpot} language={language} visible={shownSpot !== null} onClose={closeSpot} />
+      <SpotStoryModal
+        spot={shownSpot}
+        language={language}
+        visible={shownSpot !== null}
+        onClose={closeSpot}
+        onOpenSpot={setActiveSpot}
+      />
     </View>
   );
 }

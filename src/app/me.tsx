@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { AccessibilityInfo, Alert, Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -17,6 +17,26 @@ const SAVED_VISIBLE_MS = 2000;
 const FADE_MS = 200;
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
+interface Stamp {
+  spot: Spot;
+  isOn: boolean;
+  days: number;
+}
+
+/**
+ * Collected stamps first, then the rest in their original order.
+ * `version` comes from useUnlocks(); taking it as an argument makes React Compiler
+ * re-read every pass after an unlock/reset (a closure over it gets cached stale).
+ */
+function getStamps(version: number): Stamp[] {
+  void version;
+  return SPOTS.map((spot) => ({
+    spot,
+    isOn: UnlockService.isUnlocked(spot.id),
+    days: UnlockService.getDaysRemaining(spot.id),
+  })).sort((a, b) => Number(b.isOn) - Number(a.isOn));
+}
+
 export default function PassportScreen() {
   const { language, setLanguage } = useLanguage();
   const { unlockedCount, total, version } = useUnlocks();
@@ -27,6 +47,18 @@ export default function PassportScreen() {
   const [editSession, setEditSession] = useState(0);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [savedOpacity] = useState(() => new Animated.Value(0));
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Pull down: re-read passes (stamps, count, days left) and the profile
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await UnlockService.reload();
+      setProfile(UserService.getProfile());
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => UserService.subscribe(() => setProfile(UserService.getProfile())), []);
 
@@ -47,14 +79,7 @@ export default function PassportScreen() {
     };
   }, [savedAt, savedOpacity]);
 
-  // Collected stamps first, then the rest in their original order.
-  // `version` changes whenever a pass is unlocked/reset, so the order refreshes.
-  const stamps = useMemo(() => {
-    void version;
-    return [...SPOTS].sort(
-      (a, b) => Number(UnlockService.isUnlocked(b.id)) - Number(UnlockService.isUnlocked(a.id))
-    );
-  }, [version]);
+  const stamps = getStamps(version);
 
   const firstName = profile.firstName || profile.name?.split(' ')[0] || '';
   const progressPct = total > 0 ? Math.round((unlockedCount / total) * 100) : 0;
@@ -92,7 +117,7 @@ export default function PassportScreen() {
 
   return (
     <>
-      <Screen>
+      <Screen refreshing={refreshing} onRefresh={onRefresh}>
         <Header
           eyebrow={firstName ? tr(language, `Hi, ${firstName}`, `Sveiki, ${firstName}`) : undefined}
           title={tr(language, 'Passport', 'Pasas')}
@@ -142,9 +167,7 @@ export default function PassportScreen() {
 
         {/* Stamps */}
         <View style={styles.grid}>
-          {stamps.map((spot) => {
-            const isOn = UnlockService.isUnlocked(spot.id);
-            const days = UnlockService.getDaysRemaining(spot.id);
+          {stamps.map(({ spot, isOn, days }) => {
             const name = resolveText(spot.title, language);
             const state = isOn ? tr(language, 'collected', 'surinkta') : tr(language, 'locked', 'užrakinta');
             return (
@@ -214,6 +237,7 @@ export default function PassportScreen() {
         language={language}
         visible={activeSpot !== null}
         onClose={() => setActiveSpot(null)}
+        onOpenSpot={setActiveSpot}
       />
     </>
   );
