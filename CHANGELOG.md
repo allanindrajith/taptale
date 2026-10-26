@@ -4,6 +4,20 @@ All notable changes to the TapTale platform are documented in this file.
 
 ---
 
+## [v1.2.0] - UI Redesign, Real Photos, Audio Stories & Multi-App Navigation
+
+### 🚀 Overview
+TapTale v1.2.0 brings a comprehensive visual and experiential overhaul. Key highlights include an updated Wise-inspired UI architecture, real Wikimedia Commons heritage photography, authentic Gemini TTS narration and ambient Lyria music, customizable user passports with photo uploads, resilient cross-spot NFC scanning, live access pass updates, and multi-app navigation support (Google Maps, Apple Maps, Waze).
+
+### ✨ What's New
+* **Streamlined UI & Navigation**: Redesigned Explore, Passport, and Help experiences with prioritized unlocked landmarks.
+* **Curated Heritage Photography**: Real high-resolution photography with full Wikimedia Commons licensing and attribution.
+* **Authentic Story Narration & Music**: Powered by `expo-audio` with Gemini TTS narration and ambient Baltic Lyria soundscapes.
+* **Passport & Editable Profiles**: Dynamic user profile editing with camera/library photo picker support.
+* **NFC & Navigation Enhancements**: Fixed cross-spot NFC scanning, real-time pass expiration synchronization, and multi-app transit sheet.
+
+---
+
 ## [v1.1.0] - Nationwide Heritage Expansion, Pull-to-Refresh & Resilient NFC Architecture
 
 ### 🚀 Overview
