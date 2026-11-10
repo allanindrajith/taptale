@@ -13,6 +13,7 @@
   <a href="https://github.com/allanindrajith/taptale"><img src="https://img.shields.io/badge/DEMO-APP_PREVIEW-e5ad06?style=for-the-badge&logo=googlechrome&logoColor=white&labelColor=2b2b2b" alt="Demo Preview" /></a>
   <a href="#-how-it-works-the-explorer-journey"><img src="https://img.shields.io/badge/NFC_TAGGING-INTERACTIVE_UNLOCKED-9b51e0?style=for-the-badge&logo=nfc&logoColor=white&labelColor=2b2b2b" alt="NFC Tagging" /></a>
   <img src="https://img.shields.io/badge/STATUS-PRODUCTION_READY-2ecc71?style=for-the-badge&logo=checkmarx&logoColor=white&labelColor=2b2b2b" alt="Status Production Ready" />
+  <a href="https://www.buymeacoffee.com/allanidrajith"><img src="https://img.shields.io/badge/SUPPORT-BUY_ME_A_COFFEE-a3e635?style=for-the-badge&logo=buymeacoffee&logoColor=FFDD00&labelColor=2b2b2b" alt="Buy Me a Coffee" /></a>
 </p>
 
 <!-- Technology Stack Badges -->
